@@ -37,6 +37,7 @@ import {
   normalizeCategory,
   matchesCategoryFilter,
   isCommercialPlaceCategory,
+  dedupeMapMarkers,
 } from '../utils/mapMarkerUtils';
 import { JABALPUR_MAP_PLACES } from '../data/jabalpurMapPlaces';
 import { cacheItineraryPlace } from '../utils/itineraryPlacesCache';
@@ -363,11 +364,23 @@ export default function MapScreen({
         .map(apiPlaceToMarker);
       
       setAllPlaces(prev => {
-        // When filtering by category on the server, replace viewport merges carefully:
-        // keep offline/local pins, merge category batch, drop stale off-category remote pins later via client filter.
         const map = new Map(prev.map(p => [p.id, p]));
-        batch.forEach((m: MarkerData) => map.set(m.id, m));
-        return Array.from(map.values());
+        let changed = false;
+        batch.forEach((m: MarkerData) => {
+          const existing = map.get(m.id);
+          if (
+            !existing
+            || Math.abs(existing.lat - m.lat) > 0.00001
+            || Math.abs(existing.lng - m.lng) > 0.00001
+            || existing.name !== m.name
+            || existing.category !== m.category
+          ) {
+            map.set(m.id, m);
+            changed = true;
+          }
+        });
+        if (!changed) return prev;
+        return dedupeMapMarkers(Array.from(map.values()));
       });
     } catch (e) {
       console.warn('Viewport load error', e);
@@ -377,6 +390,15 @@ export default function MapScreen({
       }
     }
   }, [apiPlaceToMarker]);
+
+  const viewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleViewportFetch = useCallback((bounds: { north: number, south: number, east: number, west: number }) => {
+    lastBoundsRef.current = bounds;
+    if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
+    viewportDebounceRef.current = setTimeout(() => {
+      fetchViewportPlaces(bounds);
+    }, 350);
+  }, [fetchViewportPlaces]);
 
   // Re-fetch viewport when category chip changes so server returns category-scoped places.
   useEffect(() => {
@@ -421,25 +443,28 @@ export default function MapScreen({
   }, [contextVendors, propVendors, mapVendorToMarker]);
 
   useEffect(() => {
+    // Offline bootstrap only — once API viewport places arrive, dedupe drops
+    // these local seeds when they sit on the same spot as a remote pin.
     const jabalpurMarkers = JABALPUR_MAP_PLACES
       .filter(p => !isCommercialPlaceCategory(p.category))
       .map(mapPlaceToMarker);
     setAllPlaces(prev => {
+      const hasApiPins = prev.some(p => /^c[a-z0-9]{20,}$/i.test(p.id));
+      if (hasApiPins) {
+        // Keep API pins; only fill gaps with local seeds that aren't near an API pin.
+        return dedupeMapMarkers([...prev, ...jabalpurMarkers]);
+      }
       const map = new Map(prev.map(p => [p.id, p]));
       jabalpurMarkers.forEach(m => map.set(m.id, m));
-      return Array.from(map.values());
+      return dedupeMapMarkers(Array.from(map.values()));
     });
     if (propPlaces?.length) {
-      propPlaces
+      const batch = propPlaces
         .filter(p => !isCommercialPlaceCategory(p.category))
-        .forEach(p => {
-          const m = mapPlaceToMarker(p);
-          setAllPlaces(prev => {
-            const map = new Map(prev.map(x => [x.id, x]));
-            map.set(m.id, m);
-            return Array.from(map.values());
-          });
-        });
+        .map(mapPlaceToMarker);
+      if (batch.length) {
+        setAllPlaces(prev => dedupeMapMarkers([...prev, ...batch]));
+      }
     }
   }, [mapPlaceToMarker, propPlaces]);
 
@@ -466,7 +491,8 @@ export default function MapScreen({
     if (selectedCategory) {
       list = list.filter(m => matchesCategoryFilter(m.category, selectedCategory));
     }
-    return list;
+    // Local seed + API often share the same spot with different ids → double pins.
+    return activeTab === 'places' ? dedupeMapMarkers(list) : dedupeMapMarkers(list, 0.15);
   }, [allPlaces, allVendors, activeTab, selectedCategory]);
 
   // Haversine distance calculator
@@ -483,27 +509,30 @@ export default function MapScreen({
   }, []);
 
   const markersForMap = useMemo(() => {
-    const hasLocation = Boolean(effectivePosition?.latitude && effectivePosition?.longitude);
+    // Keep payload stable — live GPS distance used to change every tick and
+    // force a full WebView pin rebuild (visible blinking).
     return filteredMarkers.map(m => ({
-      ...m,
+      id: m.id,
+      name: m.name,
+      lat: m.lat,
+      lng: m.lng,
+      category: m.category,
+      type: m.type,
+      color: m.color,
+      emoji: m.emoji,
+      sublabel: m.sublabel,
+      rating: m.rating,
+      isCityGroup: m.isCityGroup,
       labelPriority: getMarkerLabelPriority({
         category: m.category,
         rating: m.rating,
         type: m.type,
         isCityGroup: m.isCityGroup,
       }),
-      distance:
-        hasLocation && m.lat && m.lng
-          ? `${calculateDistance(
-              effectivePosition!.latitude,
-              effectivePosition!.longitude,
-              m.lat,
-              m.lng,
-            )} km`
-          : undefined,
     }));
-  }, [filteredMarkers, effectivePosition, calculateDistance]);
+  }, [filteredMarkers]);
 
+  const lastMarkersSigRef = useRef('');
   const initialFallbackRef = useRef(false);
 
   // Center on user only on first Map tab open — not after city search or GPS updates
@@ -543,9 +572,14 @@ export default function MapScreen({
   );
 
   useEffect(() => {
-    if (mapReady) {
-      postToWebView({ type: 'setMarkers', markers: markersForMap });
-    }
+    if (!mapReady) return;
+    const sig = markersForMap
+      .map(m => `${m.id}:${Number(m.lat).toFixed(5)},${Number(m.lng).toFixed(5)}:${m.category}:${m.emoji}`)
+      .sort()
+      .join('|');
+    if (sig === lastMarkersSigRef.current) return;
+    lastMarkersSigRef.current = sig;
+    postToWebView({ type: 'setMarkers', markers: markersForMap });
   }, [mapReady, markersForMap, postToWebView]);
 
   useFocusEffect(
@@ -584,7 +618,7 @@ export default function MapScreen({
     setAllPlaces(prev => {
       const map = new Map(prev.map(p => [p.id, p]));
       touristOnly.forEach(m => map.set(m.id, m));
-      return Array.from(map.values());
+      return dedupeMapMarkers(Array.from(map.values()));
     });
   }, []);
 
@@ -983,7 +1017,7 @@ export default function MapScreen({
           break;
         case 'mapBoundsChanged': {
           if (activeTab === 'places' && data.bounds) {
-            fetchViewportPlaces(data.bounds);
+            scheduleViewportFetch(data.bounds);
           }
           break;
         }
@@ -994,7 +1028,7 @@ export default function MapScreen({
         }
       }
     } catch (e) { if (__DEV__) console.warn(e); }
-  }, [markerLookup, handleMarkerPress, fetchViewportPlaces, activeTab, pushUserLocationToMap]);
+  }, [markerLookup, handleMarkerPress, scheduleViewportFetch, activeTab, pushUserLocationToMap]);
 
   // Soft timeout — vendored Leaflet + street tiles
   useEffect(() => {

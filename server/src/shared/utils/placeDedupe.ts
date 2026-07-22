@@ -17,7 +17,8 @@ export function dedupePlacesByLocation<T extends {
   rating: number | null;
 }>(
   places: T[],
-  radiusKm = 0.3,
+  /** Default 1km — catches OSM/Wikimedia re-imports with slightly different coords/city labels. */
+  radiusKm = 1.0,
 ): T[] {
   const groups: { key: string; lat: number; lng: number; items: T[] }[] = [];
 

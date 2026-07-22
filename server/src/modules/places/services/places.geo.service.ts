@@ -159,12 +159,12 @@ export const placesGeoService = {
       ORDER BY distance ASC
     `;
 
-    const data = raw.map(mapPlaceRow);
-    const allData = { data, total };
+    const data = dedupePlacesByLocation(raw.map(mapPlaceRow));
+    const allData = { data, total: data.length };
     await cache.set(ck, allData, 120);
 
     const paged = data.slice(pagination.skip, pagination.skip + pagination.limit);
-    return paginatedResponse(paged, total, pagination);
+    return paginatedResponse(paged, data.length, pagination);
   },
 
   async viewport(query: {
@@ -216,7 +216,7 @@ export const placesGeoService = {
       LIMIT ${limit}
     `;
 
-    return raw.map(mapViewportRow);
+    return dedupePlacesByLocation(raw.map(mapViewportRow));
   },
 
   async getClusters(query: {
@@ -336,7 +336,7 @@ export const placesGeoService = {
       LIMIT ${limit}
     `;
 
-    return raw.map(mapViewportRow);
+    return dedupePlacesByLocation(raw.map(mapViewportRow));
   },
 
   async getTrending(limit: number = 20) {
@@ -362,10 +362,12 @@ export const placesGeoService = {
       LIMIT ${limit}
     `;
 
-    const result = raw.map((r: any) => ({
-      ...mapViewportRow(r),
-      engagement: Number(r.engagement),
-    }));
+    const result = dedupePlacesByLocation(
+      raw.map((r: any) => ({
+        ...mapViewportRow(r),
+        engagement: Number(r.engagement),
+      })),
+    );
 
     await cache.set(ck, result, 300);
     return result;
@@ -398,14 +400,16 @@ export const placesGeoService = {
       LIMIT ${limit}
     `;
 
-    const result = raw.map((r: any) => ({
-      ...mapViewportRow(r),
-      views: Number(r.views),
-      likes: Number(r.likes),
-      likeRatio: Number(r.views) > 0
-        ? Number(((Number(r.likes) / Number(r.views)) * 100).toFixed(1))
-        : 0,
-    }));
+    const result = dedupePlacesByLocation(
+      raw.map((r: any) => ({
+        ...mapViewportRow(r),
+        views: Number(r.views),
+        likes: Number(r.likes),
+        likeRatio: Number(r.views) > 0
+          ? Number(((Number(r.likes) / Number(r.views)) * 100).toFixed(1))
+          : 0,
+      })),
+    );
 
     await cache.set(ck, result, 300);
     return result;

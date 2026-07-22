@@ -295,6 +295,121 @@ export function getMarkerLabelPriority(input: MarkerLabelPriorityInput): number 
   return Math.min(100, Math.round(score));
 }
 
+/** Normalize place names for map pin dedupe (case / punctuation insensitive). */
+export function normalizeMapPlaceName(name: string): string {
+  return String(name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+function namesLikelySamePlace(aRaw: string, bRaw: string): boolean {
+  const a = normalizeMapPlaceName(aRaw);
+  const b = normalizeMapPlaceName(bRaw);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  // "Dhuandhar Falls" vs "Bhedaghat and Dhuandhar Falls"
+  if (a.length >= 6 && b.length >= 6 && (a.includes(b) || b.includes(a))) return true;
+
+  const stop = new Set([
+    'the', 'and', 'of', 'at', 'in', 'near', 'fort', 'temple', 'park', 'lake',
+    'falls', 'ghat', 'museum', 'garden', 'point', 'view', 'viewpoint',
+  ]);
+  const tokens = (s: string) => s.split(' ').filter((w) => w.length >= 4 && !stop.has(w));
+  const ta = tokens(a);
+  const tb = new Set(tokens(b));
+  if (!ta.length || !tb.size) return false;
+  const shared = ta.filter((t) => tb.has(t));
+  // At least one distinctive shared token (e.g. dhuandhar, madan, dumna)
+  return shared.length >= 1 && (shared.some((t) => t.length >= 5) || shared.length >= 2);
+}
+
+function preferMapMarkerScore<T extends {
+  id: string;
+  rating?: number;
+  description?: string;
+}>(m: T): number {
+  let s = (Number(m.rating) || 0) * 10;
+  s += Math.min(String(m.description || '').length / 20, 15);
+  // Prefer API cuid ids over local slug seeds (e.g. "dumna-nature-reserve")
+  if (/^c[a-z0-9]{20,}$/i.test(m.id)) s += 25;
+  else if (m.id.includes('-')) s -= 5; // local/offline slug
+  return s;
+}
+
+/**
+ * Collapse duplicate map pins:
+ * - same id
+ * - any two pins within ~200m (same physical spot, even if names differ)
+ * - similar/substring names within ~1.5km (local seed + API variants)
+ */
+export function dedupeMapMarkers<T extends {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  rating?: number;
+  description?: string;
+}>(markers: T[], radiusKm = 1.5): T[] {
+  const unique = new Map<string, T>();
+  for (const m of markers) {
+    if (!m?.id || !Number.isFinite(m.lat) || !Number.isFinite(m.lng)) continue;
+    if (!m.lat && !m.lng) continue;
+    unique.set(m.id, m);
+  }
+
+  const list = Array.from(unique.values());
+  const parent = list.map((_, i) => i);
+  const find = (i: number): number => {
+    if (parent[i] !== i) parent[i] = find(parent[i]);
+    return parent[i];
+  };
+  const unite = (i: number, j: number) => {
+    const a = find(i);
+    const b = find(j);
+    if (a !== b) parent[a] = b;
+  };
+
+  const NEAR_M_ANY_NAME_KM = 0.25; // 250m — hard double-pin
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const d = haversineKm(list[i].lat, list[i].lng, list[j].lat, list[j].lng);
+      if (d <= NEAR_M_ANY_NAME_KM) {
+        unite(i, j);
+        continue;
+      }
+      if (d <= radiusKm && namesLikelySamePlace(list[i].name, list[j].name)) {
+        unite(i, j);
+      }
+    }
+  }
+
+  const clusters = new Map<number, T[]>();
+  list.forEach((m, i) => {
+    const root = find(i);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root)!.push(m);
+  });
+
+  return Array.from(clusters.values()).map((items) =>
+    items.reduce((best, cur) =>
+      (preferMapMarkerScore(cur) > preferMapMarkerScore(best) ? cur : best)),
+  );
+}
+
 /** Jabalpur — default city center when GPS is unavailable (matches design mockup). */
 export const DEFAULT_MAP_CENTER = { lat: 23.1815, lng: 79.9864, zoom: 15 };
 export const INDIA_OVERVIEW = { lat: 20.5937, lng: 78.9629, zoom: 5 };

@@ -23,7 +23,6 @@ ${safeCss}
 
   .map-pin{
     position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;
-    animation:pinDrop .4s cubic-bezier(.34,1.56,.64,1) forwards;
     transform-origin:bottom center;
   }
 
@@ -137,6 +136,9 @@ ${safeCss}
     65%{opacity:1;transform:translateY(3px) scale(1.08)}
     80%{transform:translateY(-2px) scale(.96)}
     100%{opacity:1;transform:translateY(0) scale(1)}
+  }
+  .map-pin.is-new{
+    animation:pinDrop .4s cubic-bezier(.34,1.56,.64,1) forwards;
   }
 
   .user-dot{
@@ -360,8 +362,25 @@ function updateLabelLayout() {
     nextLayout[c.id] = chosen;
   });
 
+  // Only rebuild icons whose label visibility/offset actually changed (avoids pin blinking).
+  var changedIds = [];
+  ids.forEach(function(id) {
+    var prev = labelLayout[id] || { show: false, offsetX: 0 };
+    var next = nextLayout[id] || { show: false, offsetX: 0 };
+    if (!!prev.show !== !!next.show || Number(prev.offsetX || 0) !== Number(next.offsetX || 0)) {
+      changedIds.push(id);
+    }
+  });
+  // Also refresh selected / previously selected for badge size
+  if (selectedId && changedIds.indexOf(selectedId) < 0) changedIds.push(selectedId);
+
   labelLayout = nextLayout;
-  refreshAllIcons();
+  changedIds.forEach(function(id) {
+    var m = markerDataMap[id];
+    if (m && markerLeafletMap[id]) {
+      markerLeafletMap[id].setIcon(createIcon(m, selectedId === id));
+    }
+  });
 }
 
 function emitBounds() {
@@ -378,7 +397,11 @@ function emitBounds() {
   });
 }
 
-map.on('moveend', emitBounds);
+var boundsEmitTimer = null;
+function emitBoundsDebounced() {
+  if (boundsEmitTimer) clearTimeout(boundsEmitTimer);
+  boundsEmitTimer = setTimeout(emitBounds, 320);
+}
 
 setTimeout(function() {
   try { map.invalidateSize(true); } catch (e) {}
@@ -512,19 +535,20 @@ function getCategoryIcon(iconId) {
   return (icons[iconId] || icons.default).replace(/white/g, 'var(--pin-color)');
 }
 
-function buildPin(marker, isSelected) {
+function buildPin(marker, isSelected, isNew) {
   var color = sanitizeColor(marker.color || '#00A8A8');
   var iconId = marker.emoji || 'default';
   var svgIcon = getCategoryIcon(iconId);
   var isVendor = marker.type === 'vendor';
   var typeClass = isVendor ? ' vendor-pin' : ' place-pin';
   var selected = isSelected ? ' selected' : '';
+  var newClass = isNew ? ' is-new' : '';
   var layout = labelLayout[marker.id] || { show: false, offsetX: 0 };
   var showLabel = isSelected || layout.show;
   var labelHidden = showLabel ? '' : ' is-hidden';
   var labelStyle = layout.offsetX ? ' style="transform:translateX(' + layout.offsetX + 'px)"' : '';
 
-  var pinHtml = '<div class="map-pin' + typeClass + selected + '">'
+  var pinHtml = '<div class="map-pin' + typeClass + selected + newClass + '">'
     + '<div class="pin-badge" style="--pin-color:' + color + '">'
       + '<div class="pin-icon-box">' + svgIcon + '</div>'
     + '</div>';
@@ -554,11 +578,11 @@ function computeIconSize(isSelected, hasLabel) {
   return { w: w, h: h, ax: w / 2, ay: pinH + 2 };
 }
 
-function createIcon(marker, isSelected) {
+function createIcon(marker, isSelected, isNew) {
   var layout = labelLayout[marker.id] || { show: false, offsetX: 0 };
   var zoomOk = shouldShowLabelByZoom(marker, map.getZoom());
   var hasLabel = isSelected || (layout.show && zoomOk);
-  var html = buildPin(marker, isSelected);
+  var html = buildPin(marker, isSelected, !!isNew);
   var sz = computeIconSize(!!isSelected, hasLabel);
   return L.divIcon({
     className: '',
@@ -579,7 +603,8 @@ function applyCategoryFanOut() {
   var groups = {};
   Object.keys(markerBasePositions).forEach(function(id) {
     var point = markerBasePositions[id];
-    var key = point.lat.toFixed(5) + ':' + point.lng.toFixed(5);
+    // ~110m cells — only spiderfy truly distinct co-located POIs
+    var key = point.lat.toFixed(3) + ':' + point.lng.toFixed(3);
     (groups[key] || (groups[key] = [])).push(id);
   });
 
@@ -587,20 +612,19 @@ function applyCategoryFanOut() {
     var ids = groups[key];
     var base = markerBasePositions[ids[0]];
     if (ids.length === 1) {
-      markerLeafletMap[ids[0]].setLatLng([base.lat, base.lng]);
+      if (markerLeafletMap[ids[0]]) markerLeafletMap[ids[0]].setLatLng([base.lat, base.lng]);
       return;
     }
 
-    // A lightweight spiderfy for co-located POIs. Category/icon ordering keeps
-    // the fan stable and each original category remains immediately visible.
     ids.sort(function(a, b) {
-      var aa = (markerDataMap[a].emoji || '') + a;
-      var bb = (markerDataMap[b].emoji || '') + b;
+      var aa = ((markerDataMap[a] && markerDataMap[a].emoji) || '') + a;
+      var bb = ((markerDataMap[b] && markerDataMap[b].emoji) || '') + b;
       return aa.localeCompare(bb);
     });
     var center = map.latLngToLayerPoint([base.lat, base.lng]);
     var radius = ids.length <= 6 ? 25 : 34;
     ids.forEach(function(id, index) {
+      if (!markerLeafletMap[id]) return;
       var angle = (-Math.PI / 2) + (index * Math.PI * 2 / ids.length);
       var ring = ids.length > 8 && index >= 8 ? 1.55 : 1;
       var display = map.layerPointToLatLng([
@@ -612,29 +636,139 @@ function applyCategoryFanOut() {
   });
 }
 
-function setMarkers(markers) {
-  markerLayerGroup.clearLayers();
-  markerDataMap = {};
-  markerLeafletMap = {};
-  markerBasePositions = {};
-  if (!markers || !markers.length) return;
-  markers.forEach(function(m) {
-    markerDataMap[m.id] = m;
-    markerBasePositions[m.id] = { lat: Number(m.lat), lng: Number(m.lng) };
-    var isSel = selectedId === m.id;
-    var icon = createIcon(m, isSel);
-    var mk = L.marker([m.lat, m.lng], {
-      icon: icon,
-      zIndexOffset: m.type === 'vendor' ? 200 : 0,
-    });
-    mk._markerId = m.id;
-    mk.on('click', function() {
-      send({ type: 'markerPress', id: m.id, name: m.name, lat: m.lat, lng: m.lng });
-    });
-    markerLayerGroup.addLayer(mk);
-    markerLeafletMap[m.id] = mk;
+function markerSignature(m) {
+  return [
+    m.id,
+    Number(m.lat).toFixed(5),
+    Number(m.lng).toFixed(5),
+    m.name || '',
+    m.category || '',
+    m.type || '',
+    m.color || '',
+    m.emoji || '',
+    m.sublabel || '',
+    String(m.labelPriority || 0),
+  ].join('|');
+}
+
+function normPinName(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function pinNamesSimilar(a, b) {
+  var na = normPinName(a);
+  var nb = normPinName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.length >= 6 && nb.length >= 6 && (na.indexOf(nb) >= 0 || nb.indexOf(na) >= 0)) return true;
+  var stop = { the:1, and:1, of:1, fort:1, temple:1, park:1, lake:1, falls:1, ghat:1, museum:1, garden:1 };
+  var ta = na.split(' ').filter(function(w) { return w.length >= 4 && !stop[w]; });
+  var tb = {};
+  nb.split(' ').forEach(function(w) { if (w.length >= 4 && !stop[w]) tb[w] = 1; });
+  for (var i = 0; i < ta.length; i++) {
+    if (tb[ta[i]] && ta[i].length >= 5) return true;
+  }
+  return false;
+}
+
+function haversineKmJs(aLat, aLng, bLat, bLng) {
+  var toRad = function(d) { return d * Math.PI / 180; };
+  var R = 6371;
+  var dLat = toRad(bLat - aLat);
+  var dLng = toRad(bLng - aLng);
+  var x = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+    + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+function preferPin(a, b) {
+  var score = function(m) {
+    var s = (Number(m.rating) || 0) * 10;
+    if (/^c[a-z0-9]{20,}$/i.test(m.id)) s += 25;
+    return s;
+  };
+  return score(a) >= score(b) ? a : b;
+}
+
+/** Drop near-duplicate pins that slipped past RN (local seed + API variants). */
+function collapseNearDuplicateMarkers(markers) {
+  var list = (markers || []).filter(function(m) {
+    return m && m.id && m.lat != null && m.lng != null && !isNaN(Number(m.lat)) && !isNaN(Number(m.lng));
   });
-  applyCategoryFanOut();
+  var keep = [];
+  list.forEach(function(m) {
+    var merged = false;
+    for (var i = 0; i < keep.length; i++) {
+      var d = haversineKmJs(Number(keep[i].lat), Number(keep[i].lng), Number(m.lat), Number(m.lng));
+      if (d <= 0.25 || (d <= 1.5 && pinNamesSimilar(keep[i].name, m.name))) {
+        keep[i] = preferPin(keep[i], m);
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) keep.push(m);
+  });
+  return keep;
+}
+
+function setMarkers(markers) {
+  var next = collapseNearDuplicateMarkers(markers || []);
+  var nextIds = {};
+  next.forEach(function(m) {
+    if (m && m.id) nextIds[m.id] = m;
+  });
+
+  // Remove pins that are no longer present
+  Object.keys(markerLeafletMap).forEach(function(id) {
+    if (!nextIds[id]) {
+      try { markerLayerGroup.removeLayer(markerLeafletMap[id]); } catch (e) {}
+      delete markerLeafletMap[id];
+      delete markerDataMap[id];
+      delete markerBasePositions[id];
+      delete labelLayout[id];
+    }
+  });
+
+  var addedOrMoved = false;
+  next.forEach(function(m) {
+    if (!m || !m.id || m.lat == null || m.lng == null) return;
+    var lat = Number(m.lat);
+    var lng = Number(m.lng);
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    var existing = markerLeafletMap[m.id];
+    var prevSig = markerDataMap[m.id] ? markerSignature(markerDataMap[m.id]) : '';
+    var nextSig = markerSignature(m);
+    markerDataMap[m.id] = m;
+    markerBasePositions[m.id] = { lat: lat, lng: lng };
+
+    if (!existing) {
+      addedOrMoved = true;
+      var isSel = selectedId === m.id;
+      var mk = L.marker([lat, lng], {
+        icon: createIcon(m, isSel, true),
+        zIndexOffset: m.type === 'vendor' ? 200 : (isSel ? 100000 : 0),
+      });
+      mk._markerId = m.id;
+      mk.on('click', function() {
+        send({ type: 'markerPress', id: m.id, name: m.name, lat: m.lat, lng: m.lng });
+      });
+      markerLayerGroup.addLayer(mk);
+      markerLeafletMap[m.id] = mk;
+    } else {
+      var prevPos = existing.getLatLng();
+      if (Math.abs(prevPos.lat - lat) > 0.00001 || Math.abs(prevPos.lng - lng) > 0.00001) {
+        existing.setLatLng([lat, lng]);
+        addedOrMoved = true;
+      }
+      // Rebuild icon only when visual fields change — not on every GPS/distance tick
+      if (prevSig !== nextSig) {
+        existing.setIcon(createIcon(m, selectedId === m.id));
+      }
+    }
+  });
+
+  if (addedOrMoved) applyCategoryFanOut();
   labelLayoutKey = '';
   updateLabelLayout();
 }
@@ -808,17 +942,7 @@ map.on('zoomend', function() {
 
 map.on('moveend', function() {
   scheduleLabelLayout();
-  var bounds = map.getBounds();
-  send({
-    type: 'cameraMoved',
-    bounds: {
-      north: bounds.getNorth(),
-      south: bounds.getSouth(),
-      east: bounds.getEast(),
-      west: bounds.getWest(),
-    },
-    zoom: map.getZoom(),
-  });
+  emitBoundsDebounced();
 });
 })();
 </script>
