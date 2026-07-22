@@ -190,9 +190,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         Linking.openSettings();
       });
     } else {
-      Linking.openURL('App-Prefs:Privacy&path=LOCATION').catch(() => {
-        Linking.openSettings();
-      });
+      // App-Prefs URLs are fragile / rejected — use system Settings.
+      Linking.openSettings();
     }
   }, []);
 
@@ -207,6 +206,19 @@ export function LocationProvider({ children }: { children: ReactNode }) {
             setHasPermission(true);
             hasPermissionRef.current = true;
             startTracking();
+          }
+        } else if (Platform.OS === 'ios') {
+          // Non-prompting status check via react-native-permissions (already a dependency).
+          try {
+            const { check, PERMISSIONS, RESULTS } = require('react-native-permissions');
+            const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+            if (!cancelled && (status === RESULTS.GRANTED || status === RESULTS.LIMITED)) {
+              setHasPermission(true);
+              hasPermissionRef.current = true;
+              startTracking();
+            }
+          } catch (permErr) {
+            if (__DEV__) console.warn('[GPS] iOS permission check unavailable', permErr);
           }
         }
       } catch (e) {

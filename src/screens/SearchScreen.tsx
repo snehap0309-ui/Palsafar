@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/Badge';
 import { useTheme } from '../context/ThemeContext';
 import { searchUniversal, UniversalSearchResult } from '../services/searchService';
 import { recordSearchedPlace } from '../utils/passportPlaces';
+import { useHeaderSafePadding, useBottomSafePadding } from '../design/responsive';
 
 type Tab = never;
 
@@ -21,6 +22,9 @@ export default function SearchScreen({
   initialQuery?: string;
 }) {
   const { theme } = useTheme();
+  const headerPadTop = useHeaderSafePadding(12);
+  // Stack screen (RootNavigator Search) — not a MainTabs child
+  const scrollPadBottom = useBottomSafePadding(24);
   const [query, setQuery] = useState(initialQuery?.trim() || '');
 
   const [results, setResults] = useState<UniversalSearchResult | null>(null);
@@ -171,7 +175,7 @@ export default function SearchScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <View style={{ padding: 24, paddingTop: 56, gap: 16 }}>
+      <View style={{ padding: 24, paddingTop: headerPadTop, gap: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {onBack && (
             <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.glass, justifyContent: 'center', alignItems: 'center' }}>
@@ -194,7 +198,7 @@ export default function SearchScreen({
 
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: scrollPadBottom }}>
         {!query.trim() ? (
           <View style={{ gap: 32 }}>
             {history.length > 0 && (

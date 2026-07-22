@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
-  RefreshControl, Animated, Dimensions, Platform, Alert, FlatList, Image,
-  LayoutAnimation,
+  RefreshControl, Animated, Platform, Alert, FlatList, Image,
+  LayoutAnimation, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -11,8 +11,10 @@ import {
   MaterialIcons, Ionicons, MaterialCommunityIcons, Feather,
 } from '../utils/Icons';
 import { useDataContext } from '../context/DataContext';
+import { useUserContext } from '../context/UserContext';
 import { getVendorCategoryEmoji } from '../data/vendors';
 import { LinearGradient } from '../utils/LinearGradient';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
 import { VendorBusiness } from '../types';
 import { notificationService } from '../services/notificationService';
 import { InAppNotification } from '../services/api/notifications';
@@ -21,33 +23,115 @@ import { DEV_FLAGS } from '../config/devFlags';
 import { useVendorScreenInsets, VendorUI } from '../design/vendorLayout';
 import type { RootStackParamList } from '../navigation/types';
 import { copyToClipboard } from '../utils/clipboard';
+import VendorWorkspaceSidebar from '../components/VendorWorkspaceSidebar';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_RADIUS = 22;
 const ICON_RADIUS = 18;
 const BANNER_RADIUS = 24;
 
 const COLORS = {
-  // PalSafar cream / bronze (aligned with tourist app)
-  sky: '#B9834B',
+  // Creator-aligned cream / bronze workspace chrome
+  sky: '#A67C52',
   skyDark: '#8B6B3A',
   skyDeep: '#63300E',
   skyMedium: '#D4A87A',
   skyLight: '#D4A87A',
   skyPale: '#FBEFE2',
   skyVeryPale: '#FFF5EB',
-  white: '#FFF9F2',
+  white: '#FFFFFF',
   bg: '#FFF9F2',
-  textPrimary: '#2C1810',
+  textPrimary: '#4D3227',
   textSecondary: '#8B7355',
   textMuted: '#B8A88A',
-  border: 'rgba(200, 155, 60, 0.2)',
-  shadow: 'rgba(185, 131, 75, 0.18)',
-  success: '#6B8F71',
+  border: '#E9D4BE',
+  shadow: 'rgba(99, 48, 14, 0.16)',
+  success: '#059669',
   warning: '#B9834B',
   star: '#B9834B',
-  cardBg: '#FBEFE2',
+  cardBg: '#FFFFFF',
 };
+
+type ActivityMetric = 'redemptions' | 'views' | 'customers';
+
+function ProfileRing({ percent, size = 72 }: { percent: number; size?: number }) {
+  const stroke = 7;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, percent));
+  const offset = circ * (1 - pct / 100);
+  const cx = size / 2;
+  const cy = size / 2;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+        <Circle cx={cx} cy={cy} r={r} stroke="#FBEFE2" strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          stroke="#A67C52"
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${circ} ${circ}`}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`}
+        />
+      </Svg>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: COLORS.textPrimary }}>{pct}%</Text>
+    </View>
+  );
+}
+
+function ActivityLineChart({
+  values,
+  labels,
+  width,
+  height = 120,
+}: {
+  values: number[];
+  labels: string[];
+  width?: number;
+  height?: number;
+}) {
+  const { width: screenW } = useWindowDimensions();
+  const chartW = width ?? (screenW - 32 - 88 - 28);
+  const max = Math.max(...values, 1);
+  const pad = { top: 8, bottom: 4, left: 4, right: 4 };
+  const chartH = height - pad.top - pad.bottom;
+  const innerW = chartW - pad.left - pad.right;
+  const points = values.map((v, i) => ({
+    x: pad.left + i * (innerW / Math.max(values.length - 1, 1)),
+    y: pad.top + chartH - (v / max) * chartH,
+  }));
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${(pad.top + chartH).toFixed(1)} L ${points[0].x.toFixed(1)} ${(pad.top + chartH).toFixed(1)} Z`;
+
+  return (
+    <View>
+      <Svg width={chartW} height={height}>
+        <Defs>
+          <SvgGradient id="vendorArea" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#A67C52" stopOpacity="0.28" />
+            <Stop offset="1" stopColor="#A67C52" stopOpacity="0.02" />
+          </SvgGradient>
+        </Defs>
+        <Path d={areaPath} fill="url(#vendorArea)" />
+        <Path d={linePath} stroke="#A67C52" strokeWidth={2.5} fill="none" />
+        {points.map((p, i) => (
+          <Circle key={`pt-${i}`} cx={p.x} cy={p.y} r={3.5} fill="#A67C52" stroke="#fff" strokeWidth={1.5} />
+        ))}
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+        {labels.map((label, i) => (
+          <Text key={`${label}-${i}`} style={{ fontSize: 9, color: COLORS.textMuted, fontWeight: '600', width: 36, textAlign: i === 0 ? 'left' : i === labels.length - 1 ? 'right' : 'center' }}>
+            {i === 0 || i === labels.length - 1 || i === Math.floor(labels.length / 2) ? label : ''}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 const NAV_ITEMS = [
   { key: 'Home', icon: 'home', iconSet: 'Ionicons' },
@@ -91,13 +175,14 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
 function PerformanceCard({ icon, label, value, color, iconSet = 'MaterialIcons' }: {
   icon: string; label: string; value: string | number; color: string; iconSet?: string;
 }) {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   const IconComponent =
     iconSet === 'Ionicons' ? Ionicons :
     iconSet === 'Feather' ? Feather :
     MaterialIcons;
 
   return (
-    <View style={s.performanceCard}>
+    <View style={[s.performanceCard, { width: (SCREEN_WIDTH - 42) / 2 }]}>
       <View style={[s.perfIconWrap, { backgroundColor: color + '12' }]}>
         <IconComponent name={icon} size={20} color={color} />
       </View>
@@ -298,6 +383,7 @@ function OffersView({
   refreshing = false,
   onRefresh,
   scrollPadBottom = 120,
+  padTop = 0,
 }: {
   onCreateOffer: () => void;
   onEditOffer?: (offerId: string) => void;
@@ -309,6 +395,7 @@ function OffersView({
   refreshing?: boolean;
   onRefresh?: () => void;
   scrollPadBottom?: number;
+  padTop?: number;
 }) {
   const { deleteVendorOffer, toggleVendorOffer, duplicateVendorOffer, refreshVendorData } = useDataContext();
   const [activeFilter, setActiveFilter] = useState<OfferFilter>('Active');
@@ -437,7 +524,7 @@ function OffersView({
     <ScrollView
       style={s.scrollView}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: scrollPadBottom }}
+      contentContainerStyle={{ paddingBottom: scrollPadBottom, paddingTop: padTop }}
       refreshControl={
         onRefresh ? (
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.sky} />
@@ -450,61 +537,69 @@ function OffersView({
           <Text style={s.OvSubtitle}>Create and manage offers to attract more tourists.</Text>
         </View>
         <TouchableOpacity style={s.OvCreateBtn} onPress={onCreateOffer} activeOpacity={0.85}>
-          <MaterialIcons name="add" size={20} color={COLORS.sky} />
+          <MaterialIcons name="add" size={18} color="#FFF9F2" />
           <Text style={s.OvCreateBtnText}>Create Offer</Text>
         </TouchableOpacity>
       </View>
 
       <View style={s.OvStatsGrid}>
         {[
-          { label: 'Total Offers', value: String(totalOffers), icon: 'local-offer', color: '#B9834B' },
-          { label: 'Active Offers', value: String(activeOffers), icon: 'check-circle', color: '#6B8F71' },
-          { label: 'Total Redeems', value: String(totalRedemptions), icon: 'receipt', color: '#8B6B3A' },
-          { label: 'Points Redeemed', value: pointsRedeemed >= 1000 ? (pointsRedeemed / 1000).toFixed(1) + 'K' : String(pointsRedeemed), icon: 'star', color: '#D4A87A' },
-        ].map((item, i) => (
-          <View key={i} style={s.OvStatCard}>
-            <LinearGradient
-              colors={[COLORS.skyPale, COLORS.white, COLORS.skyVeryPale]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.OvStatGradient}
-            >
-              <View style={[s.OvStatIcon, { backgroundColor: item.color + '25' }]}>
-                <MaterialIcons name={item.icon as any} size={18} color={item.color} />
-              </View>
-              <Text style={s.OvStatValue}>{item.value}</Text>
-              <Text style={s.OvStatLabel}>{item.label}</Text>
-            </LinearGradient>
+          { label: 'Total Offers', value: String(totalOffers), icon: 'local-offer' as const, color: COLORS.sky, active: false },
+          { label: 'Active Offers', value: String(activeOffers), icon: 'check-circle' as const, color: '#059669', active: true },
+          { label: 'Total Redeems', value: String(totalRedemptions), icon: 'receipt' as const, color: COLORS.skyDark, active: false },
+          {
+            label: 'Points Redeemed',
+            value: pointsRedeemed >= 1000 ? `${(pointsRedeemed / 1000).toFixed(1)}K` : String(pointsRedeemed),
+            icon: 'star' as const,
+            color: COLORS.sky,
+            active: false,
+          },
+        ].map((item) => (
+          <View key={item.label} style={[s.OvStatCard, item.active && s.OvStatCardActive]}>
+            <View style={[s.OvStatIcon, { backgroundColor: item.color + '18' }]}>
+              <MaterialIcons name={item.icon} size={16} color={item.color} />
+            </View>
+            <Text style={[s.OvStatValue, item.active && { color: '#059669' }]}>{item.value}</Text>
+            <Text style={[s.OvStatLabel, item.active && { color: '#059669' }]}>{item.label}</Text>
           </View>
         ))}
       </View>
 
       <View style={s.OvFilterCard}>
-        <View style={s.OvFilterSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={s.OvFilterRow}>
-              {OFFER_FILTERS.map((f) => {
-                const isActive = activeFilter === f;
-                return (
-                  <TouchableOpacity key={f} onPress={() => handleFilterChange(f)} style={s.OvFilterTab}>
-                    <Text style={[s.OvFilterText, isActive && s.OvFilterTextActive]}>
-                      {f} ({filterCounts[f]})
-                    </Text>
-                    {isActive && <View style={s.OvFilterLine} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={s.OvFilterRow}>
+            {OFFER_FILTERS.map((f) => {
+              const isActive = activeFilter === f;
+              return (
+                <TouchableOpacity key={f} onPress={() => handleFilterChange(f)} style={s.OvFilterTab} activeOpacity={0.85}>
+                  <Text style={[s.OvFilterText, isActive && s.OvFilterTextActive]}>
+                    {f} ({filterCounts[f]})
+                  </Text>
+                  {isActive ? <View style={s.OvFilterLine} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
 
-      <Text style={s.OvFilterHint}>
-        {activeFilter === 'Active' ? 'Visible to tourists now' :
-         activeFilter === 'Scheduled' ? 'Goes live on start date' :
-         activeFilter === 'Expired' ? 'No longer redeemable' :
-         'Paused or unpublished — resume to go live'}
-      </Text>
+      <View style={s.OvFilterHintRow}>
+        <View style={[
+          s.OvFilterHintDot,
+          {
+            backgroundColor:
+              activeFilter === 'Active' ? '#059669'
+                : activeFilter === 'Expired' ? '#EF4444'
+                  : COLORS.sky,
+          },
+        ]} />
+        <Text style={s.OvFilterHint}>
+          {activeFilter === 'Active' ? 'Visible to tourists now' :
+           activeFilter === 'Scheduled' ? 'Goes live on start date' :
+           activeFilter === 'Expired' ? 'No longer redeemable' :
+           'Paused or unpublished — resume to go live'}
+        </Text>
+      </View>
 
       {displayCards.length === 0 ? (
         <View style={s.emptyRedemptions}>
@@ -517,7 +612,7 @@ function OffersView({
           </Text>
           {(activeFilter === 'Active' || activeFilter === 'Draft') ? (
             <TouchableOpacity style={[s.OvCreateBtn, { marginTop: 16 }]} onPress={onCreateOffer}>
-              <MaterialIcons name="add" size={18} color={COLORS.sky} />
+              <MaterialIcons name="add" size={18} color="#FFF9F2" />
               <Text style={s.OvCreateBtnText}>Create Offer</Text>
             </TouchableOpacity>
           ) : null}
@@ -526,133 +621,124 @@ function OffersView({
 
       {displayCards.map((offer) => {
         const statusColors: Record<string, string> = {
-          Active: '#6B8F71', Scheduled: '#B9834B', Expired: '#FF5A5F', Draft: COLORS.textMuted,
+          Active: '#059669', Scheduled: '#B9834B', Expired: '#EF4444', Draft: COLORS.textMuted,
         };
         const statusIcons: Record<string, string> = {
           Active: 'check-circle', Scheduled: 'schedule', Expired: 'cancel', Draft: 'edit-note',
         };
         const sc = statusColors[offer.status] || COLORS.textMuted;
         const isBusy = busyId === offer.id;
+        const timeLabel = offer.status === 'Scheduled'
+          ? `Starts in ${offer.timeLeft}`
+          : offer.validUntil === 'N/A' || !offer.validUntil
+            ? 'No end date'
+            : offer.timeLeft;
+
         return (
           <View key={offer.id} style={s.OvCard}>
-            <LinearGradient
-              colors={[COLORS.white, COLORS.skyVeryPale]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ borderRadius: CARD_RADIUS, overflow: 'hidden' }}
-            >
-              <View style={{ flexDirection: 'column' }}>
-                <View style={{ width: '100%', height: 130, backgroundColor: COLORS.skyPale }}>
-                  {offer.imageUrl ? (
-                    <Image
-                      source={{ uri: offer.imageUrl }}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                      <MaterialIcons name="local-offer" size={36} color={COLORS.sky} />
-                    </View>
-                  )}
-                  <View style={s.OvBadge}>
-                    <Text style={s.OvBadgeText}>{offer.discount}</Text>
+            <View style={s.OvCardMain}>
+              <View style={s.OvImgWrap}>
+                {offer.imageUrl ? (
+                  <Image source={{ uri: offer.imageUrl }} style={s.OvImg} resizeMode="cover" />
+                ) : (
+                  <View style={s.OvImgPlaceholder}>
+                    <MaterialIcons name="local-offer" size={28} color={COLORS.sky} />
                   </View>
+                )}
+                <View style={s.OvBadge}>
+                  <Text style={s.OvBadgeText}>{offer.discount}</Text>
                 </View>
-                <View style={s.OvCardBody}>
+              </View>
+
+              <View style={s.OvCardBody}>
+                <View style={s.OvTitleRow}>
                   <Text style={s.OvCardTitle} numberOfLines={1}>{offer.title}</Text>
-                  <View style={s.OvChipRow}>
-                    <View style={[s.OvChip, { backgroundColor: sc + '18' }]}>
-                      <MaterialIcons name={statusIcons[offer.status] as any} size={12} color={sc} />
-                      <Text style={[s.OvChipText, { color: sc, fontSize: 11 }]}>{offer.status}</Text>
-                    </View>
-                  </View>
-                  <View style={s.OvMetaRow}>
-                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.sky + '15', justifyContent: 'center', alignItems: 'center' }}>
-                      <MaterialIcons name="stars" size={12} color={COLORS.sky} />
-                    </View>
-                    <Text style={s.OvMetaText}>{offer.points} pts</Text>
-                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.skyPale, justifyContent: 'center', alignItems: 'center' }}>
-                      <MaterialIcons name="payments" size={12} color={COLORS.textSecondary} />
-                    </View>
-                    <Text style={s.OvMetaText}>Min. {offer.minBill}</Text>
-                  </View>
-                  <View style={s.OvMetaRow}>
-                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.skyPale, justifyContent: 'center', alignItems: 'center' }}>
-                      <MaterialIcons name="event" size={12} color={COLORS.textSecondary} />
-                    </View>
-                    <Text style={s.OvMetaText}>Valid till: {offer.validUntil}</Text>
-                  </View>
-                  {offer.status !== 'Draft' && (
-                    <View style={s.OvStatsMini}>
-                      <Text style={s.OvStatsMiniVal}>{offer.redemptions}</Text>
-                      <Text style={s.OvStatsMiniLbl}>Total Redeems</Text>
-                    </View>
-                  )}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
-                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: (offer.status === 'Expired' ? '#FF5A5F' : COLORS.warning) + '18', justifyContent: 'center', alignItems: 'center' }}>
-                      <MaterialIcons name="access-time" size={11} color={offer.status === 'Expired' ? '#FF5A5F' : COLORS.warning} />
-                    </View>
-                    <Text style={{ fontSize: 11, color: offer.status === 'Expired' ? '#FF5A5F' : COLORS.warning, fontWeight: '600' }}>
-                      {offer.status === 'Scheduled' ? `Starts in ${offer.timeLeft}` : offer.timeLeft}
-                    </Text>
+                  <View style={[s.OvChip, { backgroundColor: sc + '18' }]}>
+                    <MaterialIcons name={statusIcons[offer.status] as any} size={12} color={sc} />
+                    <Text style={[s.OvChipText, { color: sc }]}>{offer.status}</Text>
                   </View>
                 </View>
-              </View>
-              <View style={s.OvActionRow}>
-                <TouchableOpacity
-                  style={s.OvActionBtn}
-                  activeOpacity={0.7}
-                  disabled={isBusy}
-                  onPress={() => onEditOffer?.(offer.id)}
-                >
-                  <MaterialIcons name="edit" size={14} color={COLORS.sky} />
-                  <Text style={s.OvActionText}>Edit</Text>
-                </TouchableOpacity>
-                {offer.status !== 'Expired' ? (
-                  <TouchableOpacity
-                    style={s.OvActionBtn}
-                    activeOpacity={0.7}
-                    disabled={isBusy}
-                    onPress={() => handleToggle(offer.id, offer.isActive)}
-                  >
-                    <MaterialIcons name={offer.isActive ? 'pause' : 'play-arrow'} size={14} color={COLORS.sky} />
-                    <Text style={s.OvActionText}>{offer.isActive ? 'Pause' : 'Resume'}</Text>
-                  </TouchableOpacity>
+
+                <View style={s.OvMetaRow}>
+                  <MaterialIcons name="star" size={13} color={COLORS.sky} />
+                  <Text style={s.OvMetaText}>{offer.points} pts</Text>
+                  <Text style={s.OvMetaSep}>·</Text>
+                  <MaterialIcons name="account-balance-wallet" size={13} color={COLORS.textMuted} />
+                  <Text style={s.OvMetaText}>Min. {offer.minBill}</Text>
+                  <Text style={s.OvMetaSep}>·</Text>
+                  <MaterialIcons name="event" size={13} color={COLORS.textMuted} />
+                  <Text style={s.OvMetaText}>Valid till: {offer.validUntil}</Text>
+                </View>
+
+                {offer.status !== 'Draft' ? (
+                  <View style={s.OvRedeemBar}>
+                    <Text style={s.OvRedeemBarText}>
+                      <Text style={s.OvRedeemBarStrong}>{offer.redemptions}</Text> TOTAL REDEEMS
+                    </Text>
+                    <View style={s.OvRedeemTime}>
+                      <MaterialIcons name="access-time" size={12} color={COLORS.textMuted} />
+                      <Text style={s.OvRedeemTimeText}>{timeLabel}</Text>
+                    </View>
+                  </View>
                 ) : null}
-                <TouchableOpacity
-                  style={s.OvActionBtn}
-                  activeOpacity={0.7}
-                  disabled={isBusy}
-                  onPress={() => handleDuplicate(offer.id, offer.title)}
-                >
-                  <MaterialIcons name="content-copy" size={14} color={COLORS.sky} />
-                  <Text style={s.OvActionText}>Copy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.OvActionBtn}
-                  activeOpacity={0.7}
-                  disabled={isBusy}
-                  onPress={() => handleOfferStats(offer.id, offer.title)}
-                >
-                  <MaterialIcons name="insights" size={14} color={COLORS.sky} />
-                  <Text style={s.OvActionText}>Stats</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.OvActionBtn}
-                  activeOpacity={0.7}
-                  disabled={isBusy}
-                  onPress={() => handleDelete(offer.id, offer.title)}
-                >
-                  <MaterialIcons name="delete" size={14} color="#FF5A5F" />
-                  <Text style={s.OvActionText}>Delete</Text>
-                </TouchableOpacity>
               </View>
-            </LinearGradient>
+            </View>
+
+            <View style={s.OvActionRow}>
+              {offer.status !== 'Expired' ? (
+                <TouchableOpacity
+                  style={s.OvActionBtn}
+                  activeOpacity={0.7}
+                  disabled={isBusy}
+                  onPress={() => handleToggle(offer.id, offer.isActive)}
+                >
+                  <MaterialIcons name={offer.isActive ? 'pause' : 'play-arrow'} size={15} color={COLORS.skyDeep} />
+                  <Text style={s.OvActionText}>{offer.isActive ? 'Pause' : 'Resume'}</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={s.OvActionBtn}
+                activeOpacity={0.7}
+                disabled={isBusy}
+                onPress={() => onEditOffer?.(offer.id)}
+              >
+                <MaterialIcons name="edit" size={15} color={COLORS.skyDeep} />
+                <Text style={s.OvActionText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.OvActionBtn}
+                activeOpacity={0.7}
+                disabled={isBusy}
+                onPress={() => handleDuplicate(offer.id, offer.title)}
+              >
+                <MaterialIcons name="content-copy" size={15} color={COLORS.skyDeep} />
+                <Text style={s.OvActionText}>Copy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.OvActionBtn}
+                activeOpacity={0.7}
+                disabled={isBusy}
+                onPress={() => handleOfferStats(offer.id, offer.title)}
+              >
+                <MaterialIcons name="show-chart" size={15} color={COLORS.skyDeep} />
+                <Text style={s.OvActionText}>Stats</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.OvActionBtn}
+                activeOpacity={0.7}
+                disabled={isBusy}
+                onPress={() => handleDelete(offer.id, offer.title)}
+              >
+                <MaterialIcons name="delete-outline" size={15} color="#EF4444" />
+                <Text style={[s.OvActionText, { color: '#EF4444' }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         );
       })}
     </ScrollView>
   );
+
 }
 
 export default function VendorDashboardScreen({
@@ -665,6 +751,7 @@ export default function VendorDashboardScreen({
 }: VendorDashboardScreenProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentVendor, vendorOffers, redemptions, refreshVendorData } = useDataContext();
+  const { user, setActiveMode, onLogout: contextLogout } = useUserContext();
   const screenInsets = useVendorScreenInsets({ withTabBar: hideBottomNav });
   const [refreshing, setRefreshing] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -672,11 +759,7 @@ export default function VendorDashboardScreen({
   const [copiedId, setCopiedId] = useState(false);
   const [activeTab, setActiveTab] = useState<'Home' | 'Offers' | 'Analytics' | 'Profile'>(forcedTab || 'Home');
   const [showSidebar, setShowSidebar] = useState(false);
-
-  const closeSidebarAnd = useCallback((action: () => void) => {
-    setShowSidebar(false);
-    action();
-  }, []);
+  const [activityMetric, setActivityMetric] = useState<ActivityMetric>('redemptions');
   const [dashStats, setDashStats] = useState<{
     todayRedemptions?: number;
     totalViews?: number;
@@ -725,7 +808,6 @@ export default function VendorDashboardScreen({
   }, [visibleTab]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
-  const sidebarAnim = useRef(new Animated.Value(0)).current;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -804,6 +886,29 @@ export default function VendorDashboardScreen({
     return avg < 1 ? '<1' : Math.round(avg).toString();
   }, [activeOffers, myRedemptions]);
 
+  const profileChecks = useMemo(() => {
+    if (!currentVendor) {
+      return { percent: 0, items: [] as { label: string; done: boolean; pending?: number }[] };
+    }
+    const hasProfile = !!(currentVendor.businessName && currentVendor.address && currentVendor.phone);
+    const hasDocs = currentVendor.verificationStatus === 'approved';
+    const amenityMissing = [
+      !currentVendor.description,
+      !currentVendor.openingHours && !(currentVendor as any).operatingHours,
+      !currentVendor.website,
+    ].filter(Boolean).length;
+    const hasPhotos = !!currentVendor.imageUrl;
+    const items = [
+      { label: 'Business Profile', done: hasProfile },
+      { label: 'Documents', done: hasDocs },
+      { label: 'Amenities', done: amenityMissing === 0, pending: amenityMissing || undefined },
+      { label: 'Photos & Media', done: hasPhotos },
+    ];
+    const doneCount = items.filter((i) => i.done).length;
+    const percent = Math.round((doneCount / items.length) * 100);
+    return { percent, items };
+  }, [currentVendor]);
+
   const handleCopyId = async () => {
     if (!currentVendor) return;
     const code =
@@ -851,6 +956,19 @@ export default function VendorDashboardScreen({
     });
   }, [myRedemptions, chartDateLabels]);
 
+  const activitySeries = useMemo(() => {
+    if (activityMetric === 'customers') {
+      return chartVisitorsData.map((d) => d.unique);
+    }
+    if (activityMetric === 'views') {
+      const totalViews = dashStats?.totalViews ?? 0;
+      if (totalViews <= 0) return chartVisitorsData.map((d) => Math.max(0, d.visitors));
+      const sumR = chartVisitorsData.reduce((s, d) => s + d.visitors, 0) || 1;
+      return chartVisitorsData.map((d) => Math.round((d.visitors / sumR) * totalViews));
+    }
+    return chartVisitorsData.map((d) => d.visitors);
+  }, [activityMetric, chartVisitorsData, dashStats?.totalViews]);
+
   const chartMaxY = useMemo(() => {
     const max = Math.max(...chartVisitorsData.map(d => Math.max(d.visitors, d.unique)), 10);
     const rounded = Math.ceil(max / 50) * 50;
@@ -865,36 +983,7 @@ export default function VendorDashboardScreen({
     return labels;
   }, [chartMaxY]);
 
-  useEffect(() => {
-    Animated.timing(sidebarAnim, {
-      toValue: showSidebar ? 1 : 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start();
-  }, [showSidebar, sidebarAnim]);
-
   const toggleSidebar = () => setShowSidebar(prev => !prev);
-
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout', style: 'destructive', onPress: () => {
-          setShowSidebar(false);
-          onLogout?.();
-        },
-      },
-    ]);
-  };
-
-  const sidebarTranslateX = sidebarAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-SCREEN_WIDTH * 0.75, 0],
-  });
-  const overlayOpacity = sidebarAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 60],
@@ -942,92 +1031,68 @@ export default function VendorDashboardScreen({
     <View style={s.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
-      {/* Header — paddingTop from safe area insets (notch / Dynamic Island) */}
+      {/* Header — Creator-style studio chrome (Home only) */}
+      {visibleTab === 'Home' ? (
       <Animated.View style={[s.header, { opacity: headerOpacity, paddingTop: screenInsets.headerPadTop }]}>
-        <View style={s.headerLeft}>
-          <TouchableOpacity onPress={toggleSidebar} style={s.headerBtn}>
-            <MaterialIcons name="more-vert" size={24} color={COLORS.skyDeep} />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={toggleSidebar} style={s.headerBtn} accessibilityLabel="Open menu">
+          <Ionicons name="menu" size={24} color={COLORS.skyDeep} />
+        </TouchableOpacity>
+        <View style={s.headerCopy}>
+          <Text style={s.eyebrow}>VENDOR WORKSPACE</Text>
+          <Text style={s.greeting} numberOfLines={1}>
+            Hello, {currentVendor.businessName} 👋
+          </Text>
+          <View style={s.handleRow}>
+            <Text style={s.handle} numberOfLines={1}>
+              {currentVendor.city || 'Business'}
+            </Text>
+            {isApproved ? (
+              <MaterialCommunityIcons name="check-decagram" size={15} color={COLORS.sky} style={{ marginLeft: 4 }} />
+            ) : null}
+          </View>
         </View>
-        <View style={s.headerCenter}>
-          <Text style={s.logoText}>PalSafar</Text>
-          <Text style={s.vendorText}>Vendor</Text>
-        </View>
+        <TouchableOpacity
+          style={s.headerBtn}
+          onPress={() => navigation.navigate('Notifications')}
+          accessibilityLabel="Notifications"
+        >
+          <Ionicons name="notifications-outline" size={22} color={COLORS.skyDeep} />
+        </TouchableOpacity>
       </Animated.View>
+      ) : null}
 
       {showNotifDropdown && (
         <NotificationsDropdown visible={showNotifDropdown} onClose={() => setShowNotifDropdown(false)} />
       )}
 
-      {/* Sidebar Overlay */}
-      {showSidebar && (
-        <Animated.View style={[s.sidebarOverlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSidebar(false)} />
-        </Animated.View>
-      )}
-
-      {/* Sidebar */}
-      <Animated.View style={[s.sidebar, { transform: [{ translateX: sidebarTranslateX }], paddingTop: screenInsets.headerPadTop }]}>
-        <View style={s.sidebarHeader}>
-          <Text style={s.sidebarTitle}>Menu</Text>
-          <TouchableOpacity onPress={() => setShowSidebar(false)} style={s.sidebarCloseBtn}>
-            <MaterialIcons name="close" size={22} color={COLORS.skyDeep} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={s.sidebarDivider} />
-
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-          <TouchableOpacity
-            style={s.sidebarItem}
-            onPress={() => closeSidebarAnd(() => navigation.navigate('Notifications'))}
-          >
-            <Ionicons name="notifications-outline" size={20} color={COLORS.skyDark} />
-            <Text style={s.sidebarItemText}>Notifications</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={s.sidebarItem}
-            onPress={() => closeSidebarAnd(() => navigation.navigate('VendorSettings'))}
-          >
-            <Ionicons name="settings-outline" size={20} color={COLORS.skyDark} />
-            <Text style={s.sidebarItemText}>Business settings</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={s.sidebarItem}
-            onPress={() => closeSidebarAnd(() => navigation.navigate('LegalHub'))}
-          >
-            <Ionicons name="document-text-outline" size={20} color={COLORS.skyDark} />
-            <Text style={s.sidebarItemText}>Terms & Conditions</Text>
-          </TouchableOpacity>
-
-          <View style={s.sidebarDivider} />
-
-          <TouchableOpacity
-            style={s.sidebarItem}
-            onPress={() => closeSidebarAnd(() => navigation.navigate('VendorCustomers'))}
-          >
-            <Ionicons name="people-outline" size={20} color={COLORS.skyDark} />
-            <Text style={s.sidebarItemText}>Customers</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={s.sidebarItem}
-            onPress={() => closeSidebarAnd(() => navigation.navigate('VendorSubscription'))}
-          >
-            <Ionicons name="card-outline" size={20} color={COLORS.skyDark} />
-            <Text style={s.sidebarItemText}>Subscription & billing</Text>
-          </TouchableOpacity>
-
-          <View style={s.sidebarDivider} />
-
-          <TouchableOpacity style={s.sidebarItem} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text style={[s.sidebarItemText, { color: '#EF4444' }]}>Logout</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </Animated.View>
+      {visibleTab === 'Home' ? (
+      <VendorWorkspaceSidebar
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        user={user}
+        vendor={currentVendor}
+        offerCount={activeOffers.length}
+        redemptionCount={myRedemptions.length}
+        onNavigateOffers={() => {
+          if (onViewMyOffers) onViewMyOffers();
+          else navigation.navigate('VendorTabs', { screen: 'Offers' });
+        }}
+        onNavigateCreateOffer={onCreateOffer}
+        onNavigateAnalytics={onViewAnalytics}
+        onNavigateProfile={onViewProfile}
+        onNavigateCustomers={() => navigation.navigate('VendorCustomers')}
+        onNavigateRedemption={() => navigation.navigate('VendorRedemption')}
+        onNavigateSubscription={() => navigation.navigate('VendorSubscription')}
+        onNavigateNotifications={() => navigation.navigate('Notifications')}
+        onNavigateSettings={() => navigation.navigate('VendorSettings')}
+        onNavigateLegal={() => navigation.navigate('LegalHub')}
+        onSwitchToUser={() => setActiveMode('USER')}
+        onLogout={() => {
+          if (onLogout) onLogout();
+          else void contextLogout();
+        }}
+      />
+      ) : null}
 
       {visibleTab === 'Home' ? (
         <ScrollView
@@ -1095,7 +1160,10 @@ export default function VendorDashboardScreen({
                   </Text>
                 </View>
                 {currentVendor.showOnMap !== false && isApproved ? (
-                  <Text style={s.mapVisibilityText}>On map</Text>
+                  <View style={s.mapPill}>
+                    <View style={s.mapDot} />
+                    <Text style={s.mapVisibilityText}>On map</Text>
+                  </View>
                 ) : null}
               </View>
 
@@ -1112,32 +1180,37 @@ export default function VendorDashboardScreen({
                   </View>
 
                   <TouchableOpacity style={s.editProfileBtn} onPress={onViewProfile} activeOpacity={0.85}>
-                    <Feather name="edit-2" size={11} color="#FFFFFF" />
+                    <Feather name="edit-2" size={11} color="#FFF9F2" />
                     <Text style={s.editProfileText}>View listing</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={s.heroBodyRight}>
-                  <View style={s.heroAvatar}>
+                  <View style={s.heroPhotoWrap}>
                     {currentVendor.imageUrl ? (
                       <Image source={{ uri: currentVendor.imageUrl }} style={s.heroAvatarImage} />
                     ) : (
                       <View style={s.heroAvatarAdd}>
-                        <MaterialIcons name="add-photo-alternate" size={24} color={COLORS.sky} />
+                        <MaterialIcons name="add-photo-alternate" size={28} color={COLORS.sky} />
                       </View>
                     )}
+                    <TouchableOpacity
+                      style={s.editPhotosChip}
+                      activeOpacity={0.88}
+                      onPress={() => navigation.navigate('VendorSettings')}
+                    >
+                      <Ionicons name="image-outline" size={12} color="#FFF9F2" />
+                      <Text style={s.editPhotosChipText}>Edit photos</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
 
-              <View style={s.heroFooter}>
-                <View style={s.heroFooterCodeBlock}>
-                  <Text style={s.heroFooterLabel}>Business Code</Text>
+              <View style={s.heroMetaRow}>
+                <View style={s.heroMetaCard}>
+                  <Text style={s.heroFooterLabel}>BUSINESS CODE</Text>
                   <View style={s.heroFooterValueRow}>
-                    <Text
-                      style={s.heroFooterValue}
-                      selectable
-                    >
+                    <Text style={s.heroFooterValue} selectable>
                       {showVendorCode
                         ? vendorCode
                         : `${vendorCode.slice(0, Math.min(8, vendorCode.length))}••••`}
@@ -1158,200 +1231,150 @@ export default function VendorDashboardScreen({
                     </TouchableOpacity>
                   </View>
                 </View>
-                <View style={s.heroFooterDivider} />
-                <View style={s.heroFooterOffersBlock}>
-                  <Text style={s.heroFooterLabel}>Active offers</Text>
+                <View style={s.heroMetaCard}>
+                  <Text style={s.heroFooterLabel}>ACTIVE OFFERS</Text>
                   <Text style={s.heroFooterValueAccent}>{activeOffers.length}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (onViewMyOffers) onViewMyOffers();
+                      else navigation.navigate('VendorTabs', { screen: 'Offers' });
+                    }}
+                    hitSlop={8}
+                  >
+                    <Text style={s.heroMetaLink}>View all offers ›</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
           </View>
 
-          <View style={s.miniStatsCard}>
-            <View style={[s.miniStatsGradient, { backgroundColor: COLORS.cardBg }]}>
-              <Text style={s.snapshotHeading}>Business health</Text>
-              <View style={s.miniStatsRow}>
-                <View style={s.miniStatItem}>
-                  <Text style={[s.miniStatValue, { color: COLORS.textPrimary }]}>
-                    {Math.min(100, [
-                      !!currentVendor.businessName,
-                      !!currentVendor.address,
-                      !!currentVendor.imageUrl,
-                      isApproved,
-                      activeOffers.length > 0,
-                      !!(currentVendor as any).gstNumber || !!(currentVendor as any).phone,
-                    ].filter(Boolean).length * 17)}%
-                  </Text>
-                  <Text style={[s.miniStatLabel, { color: COLORS.textSecondary }]}>Profile</Text>
+          {/* Business health + Today */}
+          <View style={s.homeSplitRow}>
+            <View style={s.homeSplitCard}>
+              <View style={s.homeSplitHeader}>
+                <View style={s.homeSplitTitleRow}>
+                  <Ionicons name="shield-checkmark-outline" size={14} color={COLORS.sky} />
+                  <Text style={s.homeSplitTitle}>Business health</Text>
                 </View>
-                <View style={[s.miniStatDivider, { backgroundColor: COLORS.border }]} />
-                <View style={s.miniStatItem}>
-                  <Text style={[s.miniStatValue, { color: COLORS.textPrimary }]}>{activeOffers.length}</Text>
-                  <Text style={[s.miniStatLabel, { color: COLORS.textSecondary }]}>Live offers</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('VendorSettings')} hitSlop={8}>
+                  <Text style={s.homeSplitLink}>View details</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={s.healthBody}>
+                <View style={s.healthRingCol}>
+                  <ProfileRing percent={profileChecks.percent} size={76} />
+                  <Text style={s.healthRingCaption}>Profile{'\n'}Complete</Text>
                 </View>
-                <View style={[s.miniStatDivider, { backgroundColor: COLORS.border }]} />
-                <View style={s.miniStatItem}>
-                  <Text style={[s.miniStatValue, { color: COLORS.textPrimary }]}>
-                    {redemptions.filter((r) => r.vendorId === currentVendor.id).length}
-                  </Text>
-                  <Text style={[s.miniStatLabel, { color: COLORS.textSecondary }]}>Customers</Text>
+                <View style={s.healthChecklist}>
+                  {profileChecks.items.map((item) => (
+                    <View key={item.label} style={s.healthCheckRow}>
+                      <Ionicons
+                        name={item.done ? 'checkmark-circle' : 'alert-circle'}
+                        size={15}
+                        color={item.done ? COLORS.success : COLORS.warning}
+                      />
+                      <Text style={s.healthCheckLabel} numberOfLines={1}>{item.label}</Text>
+                      {!item.done && item.pending ? (
+                        <Text style={s.healthPending}>{item.pending} pending</Text>
+                      ) : null}
+                    </View>
+                  ))}
                 </View>
+              </View>
+            </View>
+
+            <View style={s.homeSplitCard}>
+              <View style={s.homeSplitHeader}>
+                <Text style={s.homeSplitTitle}>TODAY</Text>
+                <TouchableOpacity onPress={onViewAnalytics} hitSlop={8}>
+                  <Text style={s.homeSplitLink}>View all</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={s.todayList}>
+                {[
+                  {
+                    icon: 'pricetag' as const,
+                    color: '#059669',
+                    bg: 'rgba(5,150,105,0.12)',
+                    value: dashStats?.todayRedemptions ?? todayRedemptions,
+                    label: 'Redemptions',
+                  },
+                  {
+                    icon: 'eye' as const,
+                    color: '#2563EB',
+                    bg: 'rgba(37,99,235,0.12)',
+                    value: dashStats?.totalViews ?? todayVisitors,
+                    label: 'Offer Views',
+                  },
+                  {
+                    icon: 'radio' as const,
+                    color: '#7C3AED',
+                    bg: 'rgba(124,58,237,0.12)',
+                    value: activeOffers.length,
+                    label: 'Live Offers',
+                  },
+                ].map((row) => (
+                  <View key={row.label} style={s.todayRow}>
+                    <View style={[s.todayIcon, { backgroundColor: row.bg }]}>
+                      <Ionicons name={row.icon} size={14} color={row.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.todayValue}>{row.value}</Text>
+                      <Text style={s.todayLabel}>{row.label}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
           </View>
 
-          {/* Today's snapshot */}
-          <View style={s.miniStatsCard}>
-            <View style={[s.miniStatsGradient, { backgroundColor: COLORS.cardBg }]}>
-              <Text style={s.snapshotHeading}>Today</Text>
-              <View style={s.miniStatsRow}>
-                <View style={s.miniStatItem}>
-                  <Text style={[s.miniStatValue, { color: COLORS.textPrimary }]}>
-                    {dashStats?.todayRedemptions ?? todayRedemptions}
-                  </Text>
-                  <Text style={[s.miniStatLabel, { color: COLORS.textSecondary }]}>Redemptions</Text>
-                </View>
-                <View style={[s.miniStatDivider, { backgroundColor: COLORS.border }]} />
-                <View style={s.miniStatItem}>
-                  <Text style={[s.miniStatValue, { color: COLORS.textPrimary }]}>
-                    {dashStats?.totalViews ?? todayVisitors}
-                  </Text>
-                  <Text style={[s.miniStatLabel, { color: COLORS.textSecondary }]}>Offer views</Text>
-                </View>
-                <View style={[s.miniStatDivider, { backgroundColor: COLORS.border }]} />
-                <View style={s.miniStatItem}>
-                  <Text style={[s.miniStatValue, { color: COLORS.textPrimary }]}>{activeOffers.length}</Text>
-                  <Text style={[s.miniStatLabel, { color: COLORS.textSecondary }]}>Live offers</Text>
-                </View>
-              </View>
-              {dashStats != null ? (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: COLORS.border }}>
-                  <Text style={{ fontSize: 11, color: COLORS.textSecondary }}>
-                    Clicks {dashStats.totalClicks ?? 0}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: COLORS.textSecondary }}>
-                    Conv. {dashStats.conversionRate ?? 0}%
-                  </Text>
-                  {(dashStats.pendingApproval ?? 0) > 0 ? (
-                    <Text style={{ fontSize: 11, color: COLORS.warning, fontWeight: '600' }}>
-                      {dashStats.pendingApproval} pending
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
-            </View>
-          </View>
-
-          {/* Redemption trend (from real redemptions data) */}
+          {/* 7-day activity */}
           <View style={s.sectionWrap}>
             <View style={s.sectionHeaderRow}>
               <Text style={s.sectionTitle}>7-day activity</Text>
               <TouchableOpacity style={s.insightsViewAllBtn} onPress={onViewAnalytics}>
-                <Text style={s.insightsViewAllText}>Full analytics</Text>
-                <MaterialIcons name="arrow-forward-ios" size={10} color={COLORS.sky} />
+                <Text style={s.insightsViewAllText}>Full analytics ›</Text>
               </TouchableOpacity>
             </View>
             <View style={s.insightsCard}>
-              <View style={s.insightsChartHeader}>
-                <View style={s.insightsHeaderLeft}>
-                  <View style={s.insightsHeaderIcon}>
-                    <MaterialIcons name="bar-chart" size={18} color={COLORS.skyDeep} />
-                  </View>
-                  <View style={s.insightsTitleRow}>
-                    <Text style={s.insightsChartTitle}>Redemptions</Text>
-                    <Text style={s.insightsChartSubtitle}>Last 7 days</Text>
-                  </View>
+              <View style={s.activityBody}>
+                <View style={s.activityTabs}>
+                  {([
+                    { key: 'redemptions' as const, label: 'Redemptions' },
+                    { key: 'views' as const, label: 'Offer views' },
+                    { key: 'customers' as const, label: 'Unique customers' },
+                  ]).map((tab) => {
+                    const active = activityMetric === tab.key;
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        style={[s.activityTab, active && s.activityTabActive]}
+                        onPress={() => setActivityMetric(tab.key)}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={[s.activityTabText, active && s.activityTabTextActive]}>{tab.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={s.activityChartCol}>
+                  <ActivityLineChart values={activitySeries} labels={chartDateLabels} />
                 </View>
               </View>
 
-              {/* Dual Line Chart */}
-              <View style={s.chartContainer}>
-                {/* Y-axis labels */}
-                <View style={s.chartYAxis}>
-                  {chartYLabels.map((label) => (
-                    <Text key={label} style={s.chartYLabel}>{label}</Text>
-                  ))}
-                </View>
-                {/* Chart area */}
-                <View style={s.chartArea}>
-                  {/* Grid lines */}
-                  {chartYLabels.map((_, i) => (
-                    <View key={i} style={[s.chartGridLine, { top: `${(i / (chartYLabels.length - 1)) * 100}%` }]} />
-                  ))}
-                  {/* Data lines & dots - Visitors (dark teal) */}
-                  {chartVisitorsData.map((d, i) => (
-                    <View
-                      key={`v-${i}`}
-                      style={[s.chartDot, {
-                        left: `${(i / (chartVisitorsData.length - 1)) * 90 + 5}%`,
-                        bottom: `${(d.visitors / chartMaxY) * 100}%`,
-                        backgroundColor: '#8B6B3A',
-                        borderColor: '#8B6B3A',
-                        width: 8, height: 8,
-                      }]}
-                    />
-                  ))}
-                  {/* Data lines & dots - Unique (light cyan) */}
-                  {chartVisitorsData.map((d, i) => (
-                    <View
-                      key={`u-${i}`}
-                      style={[s.chartDot, {
-                        left: `${(i / (chartVisitorsData.length - 1)) * 90 + 5}%`,
-                        bottom: `${(d.unique / chartMaxY) * 100}%`,
-                        backgroundColor: '#D4A87A',
-                        borderColor: '#D4A87A',
-                        width: 6, height: 6,
-                      }]}
-                    />
-                  ))}
-                  {/* X-axis labels */}
-                  <View style={s.chartXAxis}>
-                    {chartDateLabels.map((label) => (
-                      <Text key={label} style={s.chartXLabel}>{label}</Text>
-                    ))}
+              <View style={s.activityKpiRow}>
+                {[
+                  { icon: 'people-outline' as const, label: 'Total Visitors', value: myRedemptions.length },
+                  { icon: 'person-add-outline' as const, label: 'New Visitors', value: Math.max(0, uniqueVisitors - repeatVisitors) },
+                  { icon: 'refresh-outline' as const, label: 'Returning', value: repeatVisitors },
+                  { icon: 'person-outline' as const, label: 'Unique', value: uniqueVisitors },
+                ].map((kpi) => (
+                  <View key={kpi.label} style={s.activityKpi}>
+                    <Ionicons name={kpi.icon} size={14} color={COLORS.sky} />
+                    <Text style={s.activityKpiValue}>{kpi.value}</Text>
+                    <Text style={s.activityKpiLabel}>{kpi.label}</Text>
                   </View>
-                </View>
-              </View>
-
-              {/* Legend */}
-              <View style={s.chartLegendRow}>
-                <View style={s.legendCapsule}>
-                  <View style={[s.legendDot, { backgroundColor: '#8B6B3A' }]} />
-                  <Text style={s.legendText}>Redemptions</Text>
-                </View>
-                <View style={s.legendCapsule}>
-                  <View style={[s.legendDot, { backgroundColor: '#D4A87A' }]} />
-                  <Text style={s.legendText}>Unique customers</Text>
-                </View>
-              </View>
-
-              <View style={s.insightsDivider} />
-
-              {/* Single KPI Card with 4 Partitions (2x2) */}
-              <View style={s.kpiSingleCard}>
-                <View style={s.kpiRow}>
-                  <View style={s.kpiPartition}>
-                    <Text style={s.kpiLabel}>Repeat Visitors</Text>
-                    <Text style={s.kpiValue}>{repeatVisitors}</Text>
-                  </View>
-                  <View style={s.kpiDividerVer} />
-                  <View style={s.kpiPartition}>
-                    <Text style={s.kpiLabel}>New Visitors</Text>
-                    <Text style={s.kpiValue}>{uniqueVisitors - repeatVisitors}</Text>
-                  </View>
-                </View>
-                <View style={s.kpiDividerHor} />
-                <View style={s.kpiRow}>
-                  <View style={s.kpiPartition}>
-                    <Text style={s.kpiLabel}>Redemption Rate</Text>
-                    <Text style={s.kpiValue}>{redemptionRate}</Text>
-                  </View>
-                  <View style={s.kpiDividerVer} />
-                  <View style={s.kpiPartition}>
-                    <Text style={s.kpiLabel}>Avg Offer Conversion</Text>
-                    <Text style={s.kpiValue}>{avgConversion}</Text>
-                  </View>
-                </View>
+                ))}
               </View>
             </View>
           </View>
@@ -1390,6 +1413,7 @@ export default function VendorDashboardScreen({
           refreshing={refreshing}
           onRefresh={onRefresh}
           scrollPadBottom={screenInsets.scrollPadBottom}
+          padTop={screenInsets.headerPadTop}
         />
       ) : null}
 
@@ -1438,30 +1462,51 @@ const s = StyleSheet.create({
   // Header — paddingTop applied at runtime via useSafeAreaInsets
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: VendorUI.space.screen,
     paddingBottom: VendorUI.space.md,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+    gap: 10,
     zIndex: 10,
   },
-  headerLeft: {
-    width: 40,
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
   },
-  headerCenter: {
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    color: COLORS.sky,
+  },
+  greeting: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginTop: 4,
+    letterSpacing: -0.3,
+  },
+  handleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginTop: 4,
+  },
+  handle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    flexShrink: 1,
   },
   headerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.skyPale,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginTop: 2,
   },
   notifDot: {
     position: 'absolute',
@@ -1487,72 +1532,6 @@ const s = StyleSheet.create({
     letterSpacing: -0.5,
   },
 
-
-  // Sidebar
-  sidebarOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    zIndex: 50,
-  },
-  sidebar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: Math.min(SCREEN_WIDTH * 0.78, 320),
-    maxWidth: '85%',
-    backgroundColor: COLORS.white,
-    zIndex: 51,
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 20,
-  },
-  sidebarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  sidebarTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.skyDeep,
-  },
-  sidebarCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.skyPale,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sidebarDivider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginHorizontal: 20,
-    marginVertical: 8,
-  },
-  sidebarItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginHorizontal: 8,
-  },
-  sidebarItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
 
   // Notifications Dropdown
   notifDropdown: {
@@ -1655,20 +1634,15 @@ const s = StyleSheet.create({
     color: COLORS.sky,
   },
 
-  // Hero Card — clean full-white profile surface
+  // Hero Card — Creator-style white bordered surface
   heroCard: {
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: CARD_RADIUS,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
-    shadowColor: '#2C1810',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 4,
     borderWidth: 1,
-    borderColor: 'rgba(185, 131, 75, 0.22)',
+    borderColor: COLORS.border,
   },
   heroCardInner: {
     paddingTop: 16,
@@ -1740,34 +1714,42 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroAvatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 22,
+  heroPhotoWrap: {
+    width: 108,
+    height: 108,
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#2C1810',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1.5,
-    borderColor: 'rgba(185, 131, 75, 0.28)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
     overflow: 'hidden',
   },
   heroAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
   },
   heroAvatarAdd: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.skyVeryPale,
+  },
+  editPhotosChip: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(77, 50, 39, 0.88)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  editPhotosChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFF9F2',
   },
   heroBusinessName: {
     fontSize: 18,
@@ -1803,10 +1785,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: COLORS.sky,
+    backgroundColor: COLORS.skyDeep,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 18,
+    borderRadius: 20,
     alignSelf: 'flex-start',
   },
   editProfileText: {
@@ -1814,37 +1796,38 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  heroFooter: {
+  heroMetaRow: {
     marginTop: 16,
     marginHorizontal: -16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(185, 131, 75, 0.14)',
-    gap: 12,
-  },
-  heroFooterCodeBlock: {
-    width: '100%',
-  },
-  heroFooterOffersBlock: {
+    borderTopColor: COLORS.border,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
   },
-  heroFooterItem: {
+  heroMetaCard: {
     flex: 1,
-    minWidth: 0,
+    backgroundColor: COLORS.skyPale,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  heroFooterItemRight: {
-    alignItems: 'flex-end',
+  heroMetaLink: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.sky,
+    marginTop: 4,
   },
   heroFooterLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     marginBottom: 5,
   },
   heroFooterValueRow: {
@@ -1864,7 +1847,7 @@ const s = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   heroFooterValueAccent: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: COLORS.skyDeep,
     letterSpacing: -0.4,
@@ -1873,33 +1856,184 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: COLORS.skyVeryPale,
+    backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: 'rgba(185, 131, 75, 0.18)',
+    borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroFooterDivider: {
-    height: 1,
-    width: '100%',
-    backgroundColor: 'rgba(185, 131, 75, 0.12)',
+
+  homeSplitRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 14,
+  },
+  homeSplitCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 12,
+    minHeight: 168,
+  },
+  homeSplitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 4,
+  },
+  homeSplitTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+  },
+  homeSplitTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    letterSpacing: 0.2,
+  },
+  homeSplitLink: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.sky,
+  },
+  healthBody: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  healthRingCol: {
+    alignItems: 'center',
+    width: 78,
+  },
+  healthRingCaption: {
+    marginTop: 6,
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 12,
+  },
+  healthChecklist: {
+    flex: 1,
+    gap: 7,
+  },
+  healthCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  healthCheckLabel: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  healthPending: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.warning,
+  },
+  todayList: {
+    gap: 10,
+  },
+  todayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  todayIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  todayLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  activityBody: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 10,
+  },
+  activityTabs: {
+    width: 86,
+    gap: 6,
+  },
+  activityTab: {
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: COLORS.skyPale,
+  },
+  activityTabActive: {
+    backgroundColor: 'rgba(166, 124, 82, 0.18)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  activityTabText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  activityTabTextActive: {
+    color: COLORS.skyDeep,
+  },
+  activityChartCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  activityKpiRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+  },
+  activityKpi: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  activityKpiValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  activityKpiLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textAlign: 'center',
   },
 
   // Mini Stats Card
   miniStatsCard: {
     marginHorizontal: 16,
-    marginTop: 20,
-    borderRadius: 18,
+    marginTop: 16,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: COLORS.sky,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   miniStatsGradient: {
     paddingVertical: 18,
     paddingHorizontal: 12,
+    backgroundColor: COLORS.white,
   },
   miniStatsRow: {
     flexDirection: 'row',
@@ -1910,15 +2044,15 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   miniStatValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     marginBottom: 2,
   },
   miniStatLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.75)',
+    color: COLORS.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -1941,9 +2075,9 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   sectionTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    color: COLORS.skyDeep,
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
   },
   sectionSubtitle: {
     fontSize: 12,
@@ -2091,7 +2225,6 @@ const s = StyleSheet.create({
     gap: 10,
   },
   performanceCard: {
-    width: (SCREEN_WIDTH - 42) / 2,
     backgroundColor: COLORS.white,
     borderRadius: 18,
     padding: 16,
@@ -2127,13 +2260,8 @@ const s = StyleSheet.create({
   // Insights Card
   insightsCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -2670,63 +2798,85 @@ const s = StyleSheet.create({
   // Offers View
   OvHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4,
+    alignItems: 'flex-start', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4,
   },
-  OvHeaderLeft: { flex: 1, marginRight: 16 },
-  OvTitle: { fontSize: 24, fontWeight: '800', color: COLORS.sky, letterSpacing: -0.5, marginBottom: 2 },
+  OvHeaderLeft: { flex: 1, marginRight: 12 },
+  OvTitle: { fontSize: 22, fontWeight: '800', color: COLORS.textPrimary, letterSpacing: -0.3, marginBottom: 2 },
   OvSubtitle: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 16 },
   OvCreateBtn: {
-    height: 38, borderRadius: 12, paddingHorizontal: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: COLORS.textPrimary,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
+    height: 38, borderRadius: 20, paddingHorizontal: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: COLORS.skyDeep,
   },
-  OvCreateBtnText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  OvCreateBtnText: { fontSize: 12, fontWeight: '700', color: '#FFF9F2' },
   OvStatsGrid: {
-    flexDirection: 'row', paddingHorizontal: 20,
-    gap: 8, marginTop: 14,
+    flexDirection: 'row', paddingHorizontal: 16,
+    gap: 8, marginTop: 12,
   },
   OvStatCard: {
-    width: (SCREEN_WIDTH - 40 - 24) / 4,
-    borderRadius: CARD_RADIUS,
-    shadowColor: COLORS.sky, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15, shadowRadius: 20, elevation: 10,
+    flex: 1,
+    borderRadius: 14,
     backgroundColor: COLORS.white,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+  },
+  OvStatCardActive: {
+    backgroundColor: 'rgba(5,150,105,0.06)',
+    borderColor: 'rgba(5,150,105,0.22)',
   },
   OvStatGradient: {
-    padding: 12, alignItems: 'center', position: 'relative',
+    padding: 12, alignItems: 'center',
     minHeight: 90,
+    backgroundColor: COLORS.white,
   },
   OvStatIcon: {
-    width: 28, height: 28, borderRadius: 10,
+    width: 28, height: 28, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center', marginBottom: 6,
   },
-  OvStatValue: { fontSize: 16, fontWeight: '800', color: COLORS.textPrimary, letterSpacing: -0.3, marginBottom: 1 },
-  OvStatLabel: { fontSize: 9, fontWeight: '500', color: COLORS.textMuted },
+  OvStatValue: { fontSize: 16, fontWeight: '800', color: COLORS.textPrimary, letterSpacing: -0.3 },
+  OvStatLabel: { fontSize: 9, fontWeight: '600', color: COLORS.textMuted, marginTop: 2, textAlign: 'center' },
 
   OvFilterCard: {
-    marginHorizontal: 20, marginTop: 24,
-    backgroundColor: COLORS.white, borderRadius: 18,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04, shadowRadius: 12, elevation: 3,
+    marginHorizontal: 16, marginTop: 16,
+    backgroundColor: COLORS.white, borderRadius: 16,
     borderWidth: 1, borderColor: COLORS.border,
+    paddingHorizontal: 6, paddingVertical: 2,
   },
   OvFilterSection: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 4,
   },
-  OvFilterRow: { flexDirection: 'row', gap: 4 },
+  OvFilterRow: { flexDirection: 'row', gap: 2, paddingVertical: 2 },
   OvFilterTab: {
-    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12,
     position: 'relative',
   },
-  OvFilterText: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted },
-  OvFilterTextActive: { color: COLORS.sky, fontWeight: '700' },
+  OvFilterText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
+  OvFilterTextActive: { color: COLORS.skyDeep, fontWeight: '800' },
   OvFilterLine: {
-    position: 'absolute', bottom: 2, left: 18, right: 18, height: 3,
+    position: 'absolute', bottom: 2, left: 14, right: 14, height: 3,
     backgroundColor: COLORS.sky, borderRadius: 2,
+  },
+  OvFilterHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  OvFilterHintDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  OvFilterHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
   },
   OvFilterBtn: {
     width: 28, height: 28, borderRadius: 8,
@@ -2747,18 +2897,22 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   OvCard: {
-    marginHorizontal: 20, marginTop: 12,
+    marginHorizontal: 16, marginTop: 12,
     backgroundColor: COLORS.white, borderRadius: 18,
-    shadowColor: COLORS.shadow, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.8, shadowRadius: 16, elevation: 4,
-    borderWidth: 1.5, borderColor: COLORS.border + '60', overflow: 'hidden',
+    borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden',
+  },
+  OvCardMain: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 12,
   },
   OvCardRow: { flexDirection: 'row', padding: 16 },
   OvImgWrap: {
-    width: 110, height: 110, borderRadius: 18, overflow: 'hidden',
+    width: 92, height: 92, borderRadius: 14, overflow: 'hidden',
     position: 'relative',
-    borderWidth: 2, borderColor: COLORS.skyLight + '30',
+    backgroundColor: COLORS.skyPale,
   },
+  OvImg: { width: '100%', height: '100%' },
   OvImgPlaceholder: {
     width: '100%', height: '100%',
     backgroundColor: COLORS.skyPale,
@@ -2766,30 +2920,66 @@ const s = StyleSheet.create({
   },
   OvBadge: {
     position: 'absolute', top: 6, left: 6,
-    backgroundColor: COLORS.sky,
-    paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: COLORS.skyDeep,
+    paddingHorizontal: 8, paddingVertical: 3,
     borderRadius: 8,
-    shadowColor: COLORS.skyDark, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
   },
-  OvBadgeText: { fontSize: 10, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
-  OvCardBody: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8, gap: 6 },
+  OvBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF9F2', letterSpacing: 0.2 },
+  OvCardBody: { flex: 1, minWidth: 0, gap: 8, justifyContent: 'center' },
+  OvTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   OvChipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  OvMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  OvMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  OvMetaSep: { color: COLORS.textMuted, fontSize: 11, marginHorizontal: 2 },
   OvInfo: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 4 },
   OvChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-    alignSelf: 'flex-start',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
   },
   OvDot: { width: 7, height: 7, borderRadius: 4 },
-  OvChipText: { fontSize: 11, fontWeight: '800' },
+  OvChipText: { fontSize: 10, fontWeight: '800' },
   OvCardTitle: {
-    fontSize: 18, fontWeight: '800', color: COLORS.textPrimary,
-    letterSpacing: -0.4, marginTop: 2,
+    flex: 1,
+    fontSize: 16, fontWeight: '800', color: COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
   OvMeta: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  OvMetaText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+  OvMetaText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
+  OvRedeemBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.skyPale,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  OvRedeemBarText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    letterSpacing: 0.3,
+  },
+  OvRedeemBarStrong: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  OvRedeemTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  OvRedeemTimeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
   OvStatsMini: {
     width: 90, alignItems: 'center',
     backgroundColor: COLORS.skyPale,
@@ -2800,17 +2990,15 @@ const s = StyleSheet.create({
   OvStatsMiniLbl: { fontSize: 9, color: COLORS.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   OvActionRow: {
     flexDirection: 'row', justifyContent: 'space-around', flexWrap: 'wrap',
-    paddingVertical: 8, paddingHorizontal: 8,
-    borderTopWidth: 1, borderTopColor: COLORS.skyLight + '25',
-    backgroundColor: COLORS.skyVeryPale,
-    gap: 4,
+    paddingVertical: 8, paddingHorizontal: 6,
+    borderTopWidth: 1, borderTopColor: COLORS.border,
+    backgroundColor: '#FFFCF8',
+    gap: 2,
   },
   OvActionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingVertical: 4, paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.white,
-    borderWidth: 1, borderColor: COLORS.skyLight + '20',
+    paddingVertical: 6, paddingHorizontal: 8,
+    borderRadius: 10,
   },
   OvActionText: { fontSize: 11, fontWeight: '700', color: COLORS.textSecondary },
 
@@ -2824,10 +3012,27 @@ const s = StyleSheet.create({
   statusBannerRejected: { backgroundColor: '#FF5A5F12', borderColor: '#FF5A5F40' },
   statusBannerTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 2 },
   statusBannerText: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 17 },
+  mapPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(5, 150, 105, 0.22)',
+  },
+  mapDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.success,
+  },
   mapVisibilityText: {
-    fontSize: 11, fontWeight: '700', color: COLORS.success,
-    backgroundColor: '#6B8F7114', paddingHorizontal: 9, paddingVertical: 4,
-    borderRadius: 10, borderWidth: 1, borderColor: '#6B8F7130', overflow: 'hidden',
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.success,
   },
   heroCategoryText: {
     fontSize: 12, color: COLORS.skyDark, fontWeight: '600',
@@ -2845,10 +3050,10 @@ const s = StyleSheet.create({
   guideText: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 19, marginBottom: 14 },
   guideActions: { flexDirection: 'row', gap: 10 },
   guideBtnPrimary: {
-    flex: 1, backgroundColor: COLORS.sky, borderRadius: 12,
+    flex: 1, backgroundColor: COLORS.skyDeep, borderRadius: 20,
     paddingVertical: 12, alignItems: 'center',
   },
-  guideBtnPrimaryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  guideBtnPrimaryText: { color: '#FFF9F2', fontWeight: '700', fontSize: 13 },
   guideBtnSecondary: {
     flex: 1, backgroundColor: COLORS.skyPale, borderRadius: 12,
     paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border,
@@ -2859,8 +3064,4 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1, borderColor: COLORS.border,
   },
   emptyCtaText: { color: COLORS.skyDeep, fontWeight: '700', fontSize: 13 },
-  OvFilterHint: {
-    marginHorizontal: 16, marginBottom: 10, marginTop: 2,
-    fontSize: 12, color: COLORS.textSecondary, fontWeight: '600',
-  },
 });

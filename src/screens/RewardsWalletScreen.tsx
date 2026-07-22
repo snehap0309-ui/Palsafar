@@ -13,6 +13,7 @@ import { Ionicons } from '../utils/Icons';
 import { colors, spacing, borderRadius, shadows } from '../config/theme';
 import { walletApi, WalletTransaction } from '../services/api/wallet';
 import { DEV_FLAGS } from '../config/devFlags';
+import { useHeaderSafePadding } from '../design/responsive';
 
 import { UserProfile } from '../types';
 
@@ -25,6 +26,7 @@ export default function RewardsWalletScreen({
   user,
   onBack,
 }: RewardsWalletScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [lifetimeEarned, setLifetimeEarned] = useState(0);
   const [lifetimeSpent, setLifetimeSpent] = useState(0);
@@ -63,7 +65,7 @@ export default function RewardsWalletScreen({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -143,7 +145,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xl,
+    paddingTop: 0,
     paddingBottom: spacing.md,
     backgroundColor: colors.surface,
     ...shadows.sm,

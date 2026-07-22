@@ -19,10 +19,15 @@ import { DEV_FLAGS } from '../config/devFlags';
 import { JABALPUR_MAP_PLACES } from '../data/jabalpurMapPlaces';
 import HomeSidebar from '../components/HomeSidebar';
 import { loadWishlistIds, toggleWishlistId } from '../utils/homeWishlist';
+import { subscribeUnreadBadge } from '../services/notifications/notificationBadgeStore';
+import { refreshUnreadBadgeCount } from '../services/notificationService';
+
+import { getMainTabBarClearance } from '../design/tabBarLayout';
+import { useResponsive } from '../design/responsive';
 
 const LOGO = require('../../assets/logo.png');
 /** Cap content width so phone/tablet layouts match (centered on wide screens). */
-const MAX_HOME_CONTENT_W = 440;
+const MAX_HOME_CONTENT_W = 560;
 const H_PAD = 20;
 const CAT_COLS = 6;
 const CAT_GAP = 8;
@@ -391,17 +396,21 @@ export default function HomeScreen({
 }: HomeScreenProps) {
   const insets = useSafeAreaInsets();
   const { width: windowW } = useWindowDimensions();
+  const responsive = useResponsive();
   const layout = useMemo(() => {
-    const layoutW = Math.min(windowW, MAX_HOME_CONTENT_W);
+    const maxW = responsive.isTablet ? MAX_HOME_CONTENT_W : 440;
+    const layoutW = Math.min(windowW, maxW);
     const heroW = layoutW - H_PAD * 2;
+    const catCols = responsive.isSmallPhone ? 4 : CAT_COLS;
     return {
       layoutW,
       heroW,
       heroH: heroW * 0.68,
-      placeCardW: layoutW * 0.44,
-      catW: (layoutW - H_PAD * 2 - CAT_GAP * (CAT_COLS - 1)) / CAT_COLS,
+      placeCardW: layoutW * (responsive.isSmallPhone ? 0.72 : 0.44),
+      catCols,
+      catW: (layoutW - H_PAD * 2 - CAT_GAP * (catCols - 1)) / catCols,
     };
-  }, [windowW]);
+  }, [windowW, responsive.isTablet, responsive.isSmallPhone]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const heroListRef = useRef<FlatList>(null);
   const heroTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -418,6 +427,8 @@ export default function HomeScreen({
   const [weather, setWeather] = useState<{ temp: number; label: string } | null>(null);
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => subscribeUnreadBadge(setUnreadNotifications), []);
 
   const allPlaces = useMemo(() => {
     const merged = [...places];
@@ -445,9 +456,7 @@ export default function HomeScreen({
         } catch { /* keep fallback */ }
 
         try {
-          const { notificationsApi } = require('../services/api/notifications') as typeof import('../services/api/notifications');
-          const notifRes = await notificationsApi.list(1, 5);
-          if (!cancelled) setUnreadNotifications(notifRes?.unreadCount ?? 0);
+          await refreshUnreadBadgeCount();
         } catch { /* offline */ }
       })();
       return () => { cancelled = true; };
@@ -752,7 +761,7 @@ export default function HomeScreen({
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 110, paddingTop: insets.top + 8 }}
+        contentContainerStyle={{ paddingBottom: getMainTabBarClearance(insets.bottom), paddingTop: insets.top + 8 }}
         refreshControl={
           <RefreshControl
             refreshing={!!loading}
@@ -857,9 +866,22 @@ export default function HomeScreen({
               <Text style={styles.viewAll}>View All →</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.catGrid}>
+          <View style={[styles.catGrid, responsive.isSmallPhone && styles.catGridWrap]}>
             {CATEGORIES.map(item => (
-              <CategoryTile key={item.id} item={item} onPress={() => handleCategoryPress(item)} />
+              <CategoryTile
+                key={item.id}
+                item={item}
+                onPress={() => handleCategoryPress(item)}
+                style={
+                  responsive.isSmallPhone
+                    ? {
+                        width: (layout.layoutW - H_PAD * 2 - CAT_GAP * 2) / 3,
+                        flexGrow: 0,
+                        flexShrink: 0,
+                      }
+                    : undefined
+                }
+              />
             ))}
           </View>
 
@@ -1220,6 +1242,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: H_PAD,
     gap: CAT_GAP,
     marginBottom: 22,
+  },
+  catGridWrap: {
+    flexWrap: 'wrap',
   },
   catTile: {
     flex: 1,

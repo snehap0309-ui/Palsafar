@@ -6,13 +6,12 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Platform,
   StatusBar,
   Image,
-  Dimensions,
   ScrollView,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -24,11 +23,9 @@ import { gamificationApi, walletApi } from '../services/api';
 import type { LeaderboardEntry } from '../services/api/gamification';
 import { getCampaigns } from '../services/api/campaigns';
 import type { Campaign } from '../services/api/campaigns';
+import { useHeaderSafePadding } from '../design/responsive';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const H_PAD = 16;
-const REWARD_CARD_W = SCREEN_W * 0.72;
-const HERO_W = SCREEN_W - H_PAD * 2;
 
 const C = {
   bg: '#FFF9F2',
@@ -111,6 +108,10 @@ export default function LeaderboardScreen() {
   const { user, isGuest } = useUserContext();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const { width: SCREEN_W } = useWindowDimensions();
+  const REWARD_CARD_W = SCREEN_W * 0.72;
+  const HERO_W = SCREEN_W - H_PAD * 2;
+  const headerPadTop = useHeaderSafePadding(8);
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -195,7 +196,7 @@ export default function LeaderboardScreen() {
       colors={slide.gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.heroSlide}
+      style={[styles.heroSlide, { width: HERO_W }]}
     >
       <View style={styles.heroCopy}>
         <Text style={styles.heroTitle}>{slide.title}</Text>
@@ -223,7 +224,7 @@ export default function LeaderboardScreen() {
       <TouchableOpacity
         key={`campaign-${c.id}-${index}`}
         activeOpacity={0.92}
-        style={styles.rewardCard}
+        style={[styles.rewardCard, { width: REWARD_CARD_W }]}
         onPress={() => navigation.navigate('Rewards')}
       >
         <View style={styles.rewardImageWrap}>
@@ -332,7 +333,7 @@ export default function LeaderboardScreen() {
 
   if (loading && !refreshing) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={[styles.screen, { paddingTop: headerPadTop }]}>
         <View style={styles.loader}>
           <ActivityIndicator size="large" color={C.gold} />
         </View>
@@ -345,7 +346,7 @@ export default function LeaderboardScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Icon name="arrow-back" size={22} color={C.text} />
@@ -480,7 +481,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: C.bg,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
@@ -535,7 +535,6 @@ const styles = StyleSheet.create({
   heroWrap: { marginTop: 4, marginBottom: 18 },
   heroScroll: { paddingHorizontal: H_PAD, gap: 10 },
   heroSlide: {
-    width: HERO_W,
     height: 132,
     borderRadius: 18,
     paddingHorizontal: 18,
@@ -646,7 +645,6 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   rewardCard: {
-    width: REWARD_CARD_W,
     backgroundColor: C.surface,
     borderRadius: 18,
     borderWidth: 1,

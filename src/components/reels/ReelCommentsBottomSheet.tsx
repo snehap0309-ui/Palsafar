@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, FlatList, K
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { ReelComment } from '../../types';
 import { socialApi } from '../../services/api'; // Adjust path if needed
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomSafePadding } from '../../design/responsive';
 
 interface ReelCommentsBottomSheetProps {
   reelId: string | null;
@@ -19,7 +19,7 @@ export const ReelCommentsBottomSheet: React.FC<ReelCommentsBottomSheetProps> = (
   const [comments, setComments] = useState<ReelComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState('');
-  const insets = useSafeAreaInsets();
+  const inputBottomPad = useBottomSafePadding(12);
 
   useEffect(() => {
     if (visible && reelId) {
@@ -76,7 +76,7 @@ export const ReelCommentsBottomSheet: React.FC<ReelCommentsBottomSheetProps> = (
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title}>Comments</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -89,6 +89,7 @@ export const ReelCommentsBottomSheet: React.FC<ReelCommentsBottomSheetProps> = (
             renderItem={renderComment}
             keyExtractor={(item, index) => item.id || `comment-${index}`}
             contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
             ListEmptyComponent={() => (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
@@ -98,7 +99,7 @@ export const ReelCommentsBottomSheet: React.FC<ReelCommentsBottomSheetProps> = (
             )}
           />
 
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { paddingBottom: inputBottomPad }]}>
             <TextInput
               style={styles.input}
               placeholder="Add a comment..."

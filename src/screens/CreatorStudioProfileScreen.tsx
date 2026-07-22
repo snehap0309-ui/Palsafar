@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
+  Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -12,41 +15,89 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useUserContext } from '../context/UserContext';
-import { LinearGradient } from '../utils/LinearGradient';
 import { socialApi } from '../services/api/social';
 import type { CreatorDashboard } from '../types';
+import { useStudioTabScreenInsets } from '../design/tabBarLayout';
+import { useBottomSafePadding } from '../design/responsive';
+
+const HERO = require('../assets/settings_cover.png');
 
 const C = {
-  bg: '#FDFBF8',
-  surface: '#FFFFFF',
+  bg: '#FDF7F2',
+  ink: '#4A3427',
+  textSub: '#8B7355',
+  textMuted: '#B8A88A',
+  border: 'rgba(200, 155, 60, 0.12)',
+  card: '#FFFFFF',
+  danger: '#DC4C4C',
+  dangerSoft: '#FEF2F2',
   bronze: '#A67C52',
-  deep: '#4D3227',
-  muted: '#8B7355',
-  border: '#E9D4BE',
-  soft: '#FBEFE2',
 };
-
-const LEVELS = ['Explorer', 'Pathfinder', 'Storyteller', 'Ambassador'];
-const XP_PER_LEVEL = 500;
 
 const compact = (value: number) =>
   value >= 1000 ? `${(value / 1000).toFixed(1)}K` : String(value);
 
-type MenuItem = {
+type SettingsRowConfig = {
+  key: string;
   icon: string;
+  iconColor: string;
+  iconBg: string;
   title: string;
-  subtitle: string;
-  onPress: () => void;
+  subtitle?: string;
+  danger?: boolean;
+  rightText?: string;
+  onPress?: () => void;
 };
+
+function SettingsRow({ item, isLast }: { item: SettingsRowConfig; isLast: boolean }) {
+  const pressable = !!item.onPress;
+  return (
+    <TouchableOpacity
+      disabled={!pressable}
+      onPress={item.onPress}
+      activeOpacity={pressable ? 0.75 : 1}
+      style={[styles.row, !isLast && styles.rowBorder]}
+    >
+      <View style={[styles.iconCircle, { backgroundColor: item.iconBg }]}>
+        <Icon name={item.icon as any} size={20} color={item.iconColor} />
+      </View>
+      <View style={styles.rowTextCol}>
+        <Text style={[styles.rowTitle, item.danger && styles.rowTitleDanger]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        {!!item.subtitle && (
+          <Text style={styles.rowSub} numberOfLines={2}>{item.subtitle}</Text>
+        )}
+      </View>
+      {item.rightText ? (
+        <Text style={styles.rowMeta}>{item.rightText}</Text>
+      ) : pressable ? (
+        <Icon name="chevron-forward" size={18} color={C.textMuted} />
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
+function SettingsSection({ title, items }: { title: string; items: SettingsRowConfig[] }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{title}</Text>
+      <View style={styles.card}>
+        {items.map((item, i) => (
+          <SettingsRow key={item.key} item={item} isLast={i === items.length - 1} />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 export default function CreatorStudioProfileScreen() {
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
-  const { user } = useUserContext();
+  const studioInsets = useStudioTabScreenInsets();
+  const modalPadBottom = useBottomSafePadding(20);
+  const { user, onLogout } = useUserContext();
   const [data, setData] = useState<CreatorDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -94,140 +145,214 @@ export default function CreatorStudioProfileScreen() {
     }
   };
 
+  const handleLogout = useCallback(() => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: () => {
+          void onLogout?.();
+        },
+      },
+    ]);
+  }, [onLogout]);
+
+  const p = data?.profile;
+  const displayName = p?.fullName || p?.username || user.displayName || 'Creator';
+  const handle = p?.username ? `@${p.username}` : `@${(user.displayName || 'creator').toLowerCase().replace(/\s+/g, '')}`;
+
+  const sections = useMemo(() => {
+    const creatorItems: SettingsRowConfig[] = [
+      {
+        key: 'edit',
+        icon: 'person-outline',
+        iconColor: C.ink,
+        iconBg: 'rgba(185,131,75,0.14)',
+        title: 'Account Information',
+        subtitle: 'Edit name, bio and social links',
+        onPress: () => setEditing(true),
+      },
+      {
+        key: 'password',
+        icon: 'lock-closed-outline',
+        iconColor: C.ink,
+        iconBg: 'rgba(185,131,75,0.14)',
+        title: 'Change Password',
+        subtitle: 'Update your password',
+        onPress: () => navigation.navigate('ChangePassword'),
+      },
+      {
+        key: 'privacy',
+        icon: 'shield-checkmark-outline',
+        iconColor: '#3B82F6',
+        iconBg: 'rgba(59,130,246,0.12)',
+        title: 'Privacy Settings',
+        subtitle: 'Manage your privacy preferences',
+        onPress: () => navigation.navigate('LegalHub'),
+      },
+      {
+        key: 'delete',
+        icon: 'trash-outline',
+        iconColor: C.danger,
+        iconBg: 'rgba(220,76,76,0.12)',
+        title: 'Delete Account',
+        subtitle: 'Permanently delete your account',
+        danger: true,
+        onPress: () => navigation.navigate('DeleteAccount'),
+      },
+    ];
+
+    const studioItems: SettingsRowConfig[] = [
+      {
+        key: 'insights',
+        icon: 'bar-chart-outline',
+        iconColor: '#3B82F6',
+        iconBg: 'rgba(59,130,246,0.12)',
+        title: 'Insights',
+        subtitle: 'Detailed analytics and performance',
+        onPress: () => navigation.navigate('CreatorAnalytics'),
+      },
+      {
+        key: 'earnings',
+        icon: 'wallet-outline',
+        iconColor: C.ink,
+        iconBg: 'rgba(185,131,75,0.14)',
+        title: 'Earnings',
+        subtitle: 'Track your earnings and history',
+        onPress: () => navigation.navigate('Wallet'),
+      },
+      {
+        key: 'notifications',
+        icon: 'notifications-outline',
+        iconColor: '#D97706',
+        iconBg: 'rgba(234,179,8,0.14)',
+        title: 'Notifications',
+        subtitle: 'Alerts and updates',
+        onPress: () => navigation.navigate('Notifications'),
+      },
+    ];
+
+    if (p?.username) {
+      studioItems.push({
+        key: 'public',
+        icon: 'globe-outline',
+        iconColor: '#059669',
+        iconBg: 'rgba(5,150,105,0.12)',
+        title: 'Public Creator Page',
+        subtitle: 'View how travelers see your profile',
+        onPress: () => navigation.navigate('CreatorProfile', { username: p.username }),
+      });
+    }
+
+    return [
+      { title: 'Account', items: creatorItems },
+      { title: 'Creator Studio', items: studioItems },
+      {
+        title: 'Support',
+        items: [
+          {
+            key: 'terms',
+            icon: 'document-text-outline',
+            iconColor: C.ink,
+            iconBg: 'rgba(185,131,75,0.14)',
+            title: 'Terms & Conditions',
+            subtitle: 'Read our terms and conditions',
+            onPress: () => navigation.navigate('LegalHub'),
+          },
+          {
+            key: 'help',
+            icon: 'help-circle-outline',
+            iconColor: '#3B82F6',
+            iconBg: 'rgba(59,130,246,0.12)',
+            title: 'Help Center',
+            subtitle: 'Get help and support',
+            onPress: () => navigation.navigate('LegalHub'),
+          },
+        ] as SettingsRowConfig[],
+      },
+      {
+        title: 'About',
+        items: [
+          {
+            key: 'version',
+            icon: 'phone-portrait-outline',
+            iconColor: '#3B82F6',
+            iconBg: 'rgba(59,130,246,0.12)',
+            title: 'Version',
+            rightText: '2.4.0',
+          },
+          {
+            key: 'licenses',
+            icon: 'clipboard-outline',
+            iconColor: C.ink,
+            iconBg: 'rgba(185,131,75,0.14)',
+            title: 'Licenses',
+            onPress: () =>
+              Alert.alert(
+                'Open Source Licenses',
+                'This app uses open source software. See the licenses screen for details.',
+              ),
+          },
+          {
+            key: 'rate',
+            icon: 'star-outline',
+            iconColor: '#D97706',
+            iconBg: 'rgba(234,179,8,0.14)',
+            title: 'Rate the App',
+            subtitle: 'Share your feedback with us',
+            onPress: () =>
+              Linking.openURL('https://play.google.com/store/apps/details?id=com.palsafar'),
+          },
+        ] as SettingsRowConfig[],
+      },
+    ];
+  }, [navigation, p?.username]);
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
+      <View style={[styles.root, styles.center]}>
         <ActivityIndicator color={C.bronze} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (loadError && !data) {
     return (
-      <SafeAreaView style={styles.center}>
+      <View style={[styles.root, styles.center]}>
         <Text style={styles.errorText}>{loadError}</Text>
-        <TouchableOpacity style={styles.retry} onPress={() => { setLoading(true); void load(); }}>
+        <TouchableOpacity
+          style={styles.retry}
+          onPress={() => {
+            setLoading(true);
+            void load();
+          }}
+        >
           <Text style={styles.retryText}>Try again</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  const p = data?.profile;
-  const displayName = p?.fullName || p?.username || user.displayName || 'Creator';
-  const locationLabel = user.city ? `${user.city}, Madhya Pradesh` : 'Jabalpur, Madhya Pradesh';
-  const bioText = p?.bio || 'Exploring places | Capturing stories | Inspiring journeys 🌿';
-
-  const xp = user.totalPoints % XP_PER_LEVEL;
-  const levelIndex = Math.min(LEVELS.length - 1, Math.floor(user.totalPoints / XP_PER_LEVEL));
-  const levelName = LEVELS[levelIndex];
-  const levelNumber = levelIndex + 1;
-
-  const stats = [
-    { icon: 'eye-outline', label: 'Views', value: compact(p?.totalViews || 0) },
-    { icon: 'people-outline', label: 'Followers', value: compact(p?.followerCount || 0) },
-    { icon: 'play-outline', label: 'Reels', value: String(data?.reelCount || 0) },
-    { icon: 'heart-outline', label: 'Likes', value: compact(data?.totalLikes || 0) },
-  ];
-
-  const mainMenu: MenuItem[] = [
-    {
-      icon: 'person-outline',
-      title: 'Account Information',
-      subtitle: 'Manage your personal details',
-      onPress: () => setEditing(true),
-    },
-    {
-      icon: 'ribbon-outline',
-      title: 'My Achievements',
-      subtitle: 'Badges, milestones and rewards',
-      onPress: () => navigation.navigate('Leaderboard'),
-    },
-    {
-      icon: 'bar-chart-outline',
-      title: 'Insights',
-      subtitle: 'Detailed analytics and performance',
-      onPress: () => navigation.navigate('CreatorAnalytics'),
-    },
-    {
-      icon: 'wallet-outline',
-      title: 'Earnings',
-      subtitle: 'Track your earnings and history',
-      onPress: () => navigation.navigate('Wallet'),
-    },
-    {
-      icon: 'settings-outline',
-      title: 'Settings',
-      subtitle: 'Preferences and account settings',
-      onPress: () => navigation.navigate('Settings'),
-    },
-  ];
-
-  const supportMenu: MenuItem[] = [
-    {
-      icon: 'help-circle-outline',
-      title: 'Help Center',
-      subtitle: 'Get help and support',
-      onPress: () => navigation.navigate('LegalHub'),
-    },
-    {
-      icon: 'shield-checkmark-outline',
-      title: 'Privacy & Safety',
-      subtitle: 'Manage privacy and safety',
-      onPress: () =>
-        navigation.navigate('LegalDocument', { type: 'PRIVACY_POLICY', title: 'Privacy Policy' }),
-    },
-    {
-      icon: 'chatbubble-ellipses-outline',
-      title: 'Feedback',
-      subtitle: 'Share your feedback with us',
-      onPress: () =>
-        Alert.alert(
-          'Share feedback',
-          'Tell us how we can improve the creator studio. Email support@palsafar.com with your ideas.',
-        ),
-    },
-  ];
-
   return (
-    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
+    <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
+        contentContainerStyle={{ paddingBottom: studioInsets.scrollPadBottom }}
       >
-        <View style={[styles.topHeader, { paddingTop: insets.top + 8 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>CREATOR PROFILE</Text>
-            <Text style={styles.greeting}>Hello, {displayName} 👋</Text>
-            <Text style={styles.handle}>
-              @{p?.username}{p?.verified ? '  ✓' : ''}
-            </Text>
+        <View style={styles.heroWrap}>
+          <Image source={HERO} style={styles.heroImage} resizeMode="cover" />
+          <View style={[styles.heroBar, { paddingTop: studioInsets.headerPadTop }]}>
+            <View style={styles.backBtn} />
+            <Text style={styles.heroTitle}>Settings</Text>
+            <View style={styles.backBtn} />
           </View>
-          <TouchableOpacity
-            style={styles.bellBtn}
-            onPress={() => navigation.navigate('Notifications')}
-            accessibilityLabel="Notifications"
-          >
-            <Icon name="notifications-outline" size={22} color={C.bronze} />
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.coverWrap}>
-          <LinearGradient
-            colors={['#E8C4A0', '#C9886B', '#7A5C47', '#4A382F']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.cover}
-          >
-            <MaterialCommunityIcons
-              name="image-filter-hdr"
-              size={120}
-              color="rgba(255,255,255,0.12)"
-              style={styles.coverDecor}
-            />
-          </LinearGradient>
-
-          <View style={styles.coverOverlay}>
+        <View style={styles.body}>
+          <View style={styles.profileCard}>
             <View style={styles.avatarWrap}>
               {p?.avatar ? (
                 <Image source={{ uri: p.avatar }} style={styles.avatar} />
@@ -236,91 +361,59 @@ export default function CreatorStudioProfileScreen() {
                   <Text style={styles.avatarLetter}>{displayName.slice(0, 1).toUpperCase()}</Text>
                 </View>
               )}
-              <View style={styles.cameraBadge}>
-                <Icon name="camera" size={11} color="#fff" />
-              </View>
             </View>
-
-            <TouchableOpacity style={styles.editProfileBtn} onPress={() => setEditing(true)}>
-              <Icon name="create-outline" size={14} color={C.deep} />
-              <Text style={styles.editProfileText}>Edit Profile</Text>
+            <View style={styles.profileCopy}>
+              <Text style={styles.profileName} numberOfLines={1}>{displayName}</Text>
+              <Text style={styles.profileHandle} numberOfLines={1}>
+                {handle}{p?.verified ? '  ✓' : ''}
+              </Text>
+              <Text style={styles.profileRole}>Travel Creator</Text>
+            </View>
+            <TouchableOpacity style={styles.editChip} onPress={() => setEditing(true)} activeOpacity={0.85}>
+              <Icon name="create-outline" size={16} color={C.ink} />
             </TouchableOpacity>
           </View>
-        </View>
 
-        <View style={styles.identityBlock}>
-          <Text style={styles.profileName}>{displayName}</Text>
-          <Text style={styles.profileRole}>Travel Creator</Text>
-          <View style={styles.locationRow}>
-            <Icon name="location-outline" size={14} color={C.muted} />
-            <Text style={styles.locationText}>{locationLabel}</Text>
-          </View>
-          <Text style={styles.bio}>{bioText}</Text>
-        </View>
-
-        <View style={styles.statsRow}>
-          {stats.map((stat, index) => (
-            <React.Fragment key={stat.label}>
-              {index > 0 ? <View style={styles.statDivider} /> : null}
-              <View style={styles.statCell}>
-                <Icon name={stat.icon} size={16} color={C.bronze} />
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
-
-        <View style={styles.levelCard}>
-          <View style={styles.levelBadgeWrap}>
-            <MaterialCommunityIcons name="hexagon-slice-6" size={44} color={C.bronze} />
-            <Icon name="star" size={13} color="#fff" style={styles.levelStar} />
-          </View>
-          <View style={styles.levelBody}>
-            <Text style={styles.levelTitle}>{levelName}</Text>
-            <Text style={styles.levelSub}>Level {levelNumber}</Text>
-            <View style={styles.xpTrack}>
-              <View style={[styles.xpFill, { width: `${Math.min(100, (xp / XP_PER_LEVEL) * 100)}%` }]} />
+          <View style={styles.statsRow}>
+            <View style={styles.statCell}>
+              <Text style={styles.statValue}>{compact(p?.totalViews || 0)}</Text>
+              <Text style={styles.statLabel}>Views</Text>
             </View>
-            <Text style={styles.xpText}>
-              {xp} / {XP_PER_LEVEL} XP
-            </Text>
+            <View style={styles.statDivider} />
+            <View style={styles.statCell}>
+              <Text style={styles.statValue}>{compact(p?.followerCount || 0)}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statCell}>
+              <Text style={styles.statValue}>{String(data?.reelCount || 0)}</Text>
+              <Text style={styles.statLabel}>Reels</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statCell}>
+              <Text style={styles.statValue}>{compact(data?.totalLikes || 0)}</Text>
+              <Text style={styles.statLabel}>Likes</Text>
+            </View>
           </View>
-          <TouchableOpacity style={styles.viewProgressBtn} onPress={() => navigation.navigate('Leaderboard')}>
-            <Text style={styles.viewProgressText}>View Progress</Text>
+
+          {sections.map(section => (
+            <SettingsSection key={section.title} title={section.title} items={section.items} />
+          ))}
+
+          <TouchableOpacity onPress={handleLogout} activeOpacity={0.88} style={styles.signOutBtn}>
+            <Icon name="log-out-outline" size={20} color={C.danger} />
+            <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.menuCard}>
-          {mainMenu.map((item, index) => (
-            <MenuRow key={item.title} item={item} isLast={index === mainMenu.length - 1} />
-          ))}
-        </View>
-
-        <Text style={styles.sectionTitle}>Tools & Support</Text>
-        <View style={styles.menuCard}>
-          {supportMenu.map((item, index) => (
-            <MenuRow key={item.title} item={item} isLast={index === supportMenu.length - 1} />
-          ))}
-        </View>
-
-        {p?.username ? (
-          <TouchableOpacity
-            style={styles.publicLink}
-            onPress={() => navigation.navigate('CreatorProfile', { username: p.username })}
-          >
-            <Text style={styles.publicLinkText}>View public creator page ›</Text>
-          </TouchableOpacity>
-        ) : null}
       </ScrollView>
 
       <Modal visible={editing} transparent animationType="slide" onRequestClose={() => setEditing(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.modalSheet, { paddingBottom: modalPadBottom }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit profile</Text>
               <TouchableOpacity onPress={() => setEditing(false)}>
-                <Icon name="close" size={24} color={C.deep} />
+                <Icon name="close" size={24} color={C.ink} />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -336,26 +429,7 @@ export default function CreatorStudioProfileScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
-  );
-}
-
-function MenuRow({ item, isLast }: { item: MenuItem; isLast: boolean }) {
-  return (
-    <TouchableOpacity
-      style={[styles.menuRow, !isLast && styles.menuRowBorder]}
-      onPress={item.onPress}
-      activeOpacity={0.85}
-    >
-      <View style={styles.menuIconWrap}>
-        <Icon name={item.icon} size={18} color={C.bronze} />
-      </View>
-      <View style={styles.menuCopy}>
-        <Text style={styles.menuTitle}>{item.title}</Text>
-        <Text style={styles.menuSub}>{item.subtitle}</Text>
-      </View>
-      <Icon name="chevron-forward" size={18} color={C.muted} />
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -365,7 +439,7 @@ function Field({ label, ...props }: any) {
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         {...props}
-        placeholderTextColor={C.muted}
+        placeholderTextColor={C.textMuted}
         style={[styles.input, props.multiline && styles.textarea]}
       />
     </View>
@@ -373,163 +447,243 @@ function Field({ label, ...props }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
-  center: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorText: { color: C.muted, textAlign: 'center', marginBottom: 14, fontWeight: '600' },
-  retry: { backgroundColor: C.bronze, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12 },
-  retryText: { color: '#fff', fontWeight: '800' },
-  content: { paddingHorizontal: 20 },
-  topHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
-  eyebrow: { fontWeight: '800', fontSize: 11, letterSpacing: 1.5, color: C.bronze },
-  greeting: { fontSize: 24, fontWeight: '800', color: C.deep, marginTop: 4 },
-  handle: { fontSize: 13, color: C.muted, marginTop: 2 },
-  bellBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  root: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  center: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    marginLeft: 10,
+    padding: 24,
   },
-  coverWrap: { marginBottom: 52, position: 'relative' },
-  cover: {
-    height: 140,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  coverDecor: { position: 'absolute', right: 16, bottom: -10 },
-  coverOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -36,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  avatarWrap: { position: 'relative' },
-  avatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 3,
-    borderColor: C.surface,
-    backgroundColor: C.soft,
-  },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { fontSize: 28, fontWeight: '800', color: C.bronze },
-  cameraBadge: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: C.bronze,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: C.surface,
-  },
-  editProfileBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 6,
-  },
-  editProfileText: { fontSize: 12, fontWeight: '700', color: C.deep },
-  identityBlock: { marginBottom: 18 },
-  profileName: { fontSize: 18, fontWeight: '800', color: C.deep },
-  profileRole: { fontSize: 13, color: C.muted, marginTop: 3 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  locationText: { fontSize: 12, color: C.muted },
-  bio: { fontSize: 13, color: C.deep, marginTop: 10, lineHeight: 19 },
-  statsRow: {
-    flexDirection: 'row',
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    paddingVertical: 14,
+  errorText: {
+    color: C.textSub,
+    textAlign: 'center',
     marginBottom: 14,
+    fontWeight: '600',
   },
-  statCell: { flex: 1, alignItems: 'center', gap: 4 },
-  statDivider: { width: 1, backgroundColor: C.border, marginVertical: 4 },
-  statValue: { fontSize: 15, fontWeight: '800', color: C.deep },
-  statLabel: { fontSize: 10, color: C.muted, fontWeight: '600' },
-  levelCard: {
+  retry: {
+    backgroundColor: C.bronze,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  retryText: { color: '#fff', fontWeight: '800' },
+  heroWrap: {
+    height: 228,
+    overflow: 'hidden',
+    backgroundColor: '#F3EBE0',
+  },
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  heroBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: C.soft,
-    borderRadius: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    zIndex: 2,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: C.ink,
+    letterSpacing: -0.3,
+  },
+  body: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    gap: 22,
+  },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: C.card,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: C.border,
     padding: 14,
-    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(74,52,39,0.08)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 12,
+      },
+      android: { elevation: 2 },
+    }),
   },
-  levelBadgeWrap: {
-    width: 44,
-    height: 44,
+  avatarWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    overflow: 'hidden',
+  },
+  avatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+  },
+  avatarFallback: {
+    backgroundColor: 'rgba(185,131,75,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  levelStar: { position: 'absolute' },
-  levelBody: { flex: 1, minWidth: 0 },
-  levelTitle: { fontSize: 15, fontWeight: '800', color: C.deep },
-  levelSub: { fontSize: 11, color: C.muted, marginTop: 2, marginBottom: 8 },
-  xpTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.7)', overflow: 'hidden' },
-  xpFill: { height: '100%', backgroundColor: C.bronze, borderRadius: 3 },
-  xpText: { fontSize: 10, fontWeight: '700', color: C.deep, marginTop: 5 },
-  viewProgressBtn: {
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: C.surface,
+  avatarLetter: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: C.ink,
   },
-  viewProgressText: { fontSize: 10, fontWeight: '800', color: C.deep },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: C.deep, marginBottom: 10, marginTop: 4 },
-  menuCard: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    overflow: 'hidden',
-    marginBottom: 16,
+  profileCopy: {
+    flex: 1,
+    minWidth: 0,
   },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+  profileName: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: C.ink,
   },
-  menuRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
-  menuIconWrap: {
+  profileHandle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: C.textSub,
+    marginTop: 2,
+  },
+  profileRole: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.bronze,
+    marginTop: 4,
+  },
+  editChip: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: C.soft,
+    backgroundColor: 'rgba(185,131,75,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuCopy: { flex: 1, minWidth: 0 },
-  menuTitle: { fontSize: 14, fontWeight: '800', color: C.deep },
-  menuSub: { fontSize: 11, color: C.muted, marginTop: 2 },
-  publicLink: { alignItems: 'center', paddingVertical: 8 },
-  publicLinkText: { fontSize: 12, fontWeight: '700', color: C.bronze },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+  },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 28,
+    backgroundColor: 'rgba(74,52,39,0.12)',
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.ink,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textSub,
+  },
+  section: {
+    gap: 10,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.ink,
+    paddingLeft: 4,
+  },
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(74,52,39,0.08)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 12,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 14,
+  },
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(74,52,39,0.08)',
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowTextCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  rowTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.ink,
+  },
+  rowTitleDanger: {
+    color: C.danger,
+  },
+  rowSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: C.textSub,
+    lineHeight: 16,
+  },
+  rowMeta: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.textSub,
+  },
+  signOutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: C.dangerSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(220,76,76,0.12)',
+  },
+  signOutText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: C.danger,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(44,24,16,0.45)',
@@ -549,16 +703,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: C.deep },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: C.ink },
   field: { marginBottom: 12 },
-  fieldLabel: { fontSize: 12, fontWeight: '800', color: C.deep, marginBottom: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '800', color: C.ink, marginBottom: 6 },
   input: {
-    backgroundColor: C.surface,
+    backgroundColor: C.card,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 10,
     padding: 12,
-    color: C.deep,
+    color: C.ink,
   },
   textarea: { height: 100, textAlignVertical: 'top' },
   saveBtn: {

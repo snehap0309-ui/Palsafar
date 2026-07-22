@@ -8,7 +8,6 @@ import { View,
   
   Modal,
   TextInput,
-  Dimensions,
   ActivityIndicator,
   Share,
   RefreshControl,
@@ -32,8 +31,8 @@ import { quickAddPlaceToTrip } from '../utils/quickAddPlace';
 import RideOptionsSheet from '../components/RideOptionsSheet';
 import { useNavigation } from '@react-navigation/native';
 import { useToast } from '../context/ToastContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { useResponsive } from '../design/responsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SpotDetailProps {
   spot: TouristSpot;
@@ -65,7 +64,11 @@ export default function SpotDetailScreen({
   const navigation = useNavigation<any>();
   const { theme } = useTheme();
   const colors = theme;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsive();
+  const puzzleSize = responsive.fitWidth(270, 48);
+  const tileSize = puzzleSize / 3;
+  const styles = useMemo(() => createStyles(theme, puzzleSize, tileSize), [theme, puzzleSize, tileSize]);
   const isVisited = user?.visitedSpots?.includes(spot.id);
 
   const { effectivePosition } = useLocationContext();
@@ -519,6 +522,7 @@ export default function SpotDetailScreen({
     <View style={styles.container}>
       {/* Custom Glassmorphism Header */}
       <Animated.View style={[styles.header, {
+        paddingTop: insets.top + 8,
         backgroundColor: scrollY.interpolate({
           inputRange: [0, 200],
           outputRange: ['rgba(0,0,0,0)', 'rgba(21, 25, 37, 0.9)']
@@ -796,7 +800,7 @@ export default function SpotDetailScreen({
                   </Text>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.reviewUser, { color: colors.text }]}>
-                      {item.user?.displayName || item.user?.name || 'Explorer'}
+                      {item.user?.displayName || item.user?.name || 'Traveler'}
                     </Text>
                     <View style={styles.stars}>
                       {[1, 2, 3, 4, 5].map(s => (
@@ -1019,10 +1023,10 @@ export default function SpotDetailScreen({
                       source={imageSource}
                       style={{
                         position: 'absolute',
-                        width: 270,
-                        height: 270,
-                        top: -origRow * 90,
-                        left: -origCol * 90,
+                        width: puzzleSize,
+                        height: puzzleSize,
+                        top: -origRow * tileSize,
+                        left: -origCol * tileSize,
                       }}
                       resizeMode="cover"
                     />
@@ -1062,7 +1066,11 @@ export default function SpotDetailScreen({
   );
 }
 
-function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
+function createStyles(
+  theme: ReturnType<typeof useTheme>['theme'],
+  puzzleSize = 270,
+  tileSize = 90,
+) {
   const c = theme;
   return StyleSheet.create({
     container: {
@@ -1128,14 +1136,14 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
     },
     carouselContainer: {
       height: 240,
-      width: SCREEN_WIDTH,
+      width: '100%',
       position: 'relative',
     },
     carousel: {
       flex: 1,
     },
     carouselImage: {
-      width: SCREEN_WIDTH,
+      width: '100%',
       height: 240,
     },
     carouselOverlay: {
@@ -1728,17 +1736,18 @@ function createStyles(theme: ReturnType<typeof useTheme>['theme']) {
       marginLeft: 4,
     },
     puzzleBoard: {
-      width: 270,
-      height: 270,
+      width: puzzleSize,
+      height: puzzleSize,
       flexWrap: 'wrap',
       flexDirection: 'row',
       backgroundColor: '#E2E8F0',
       borderWidth: 1,
       borderColor: '#CBD5E1',
+      alignSelf: 'center',
     },
     puzzleTile: {
-      width: 90,
-      height: 90,
+      width: tileSize,
+      height: tileSize,
       borderWidth: 1,
       borderColor: '#fff',
       position: 'relative',

@@ -15,6 +15,7 @@ import {
   VENDOR_TAB_BAR_HEIGHT,
   VendorUI,
 } from '../design/vendorLayout';
+import { MIN_TOUCH } from '../design/responsive';
 
 const Tab = createBottomTabNavigator<VendorTabParamList>();
 type RootNav = NativeStackNavigationProp<RootStackParamList>;
@@ -114,23 +115,8 @@ function VendorAnalyticsTab() {
 }
 
 function VendorProfileTab() {
-  const navigation = useNavigation<RootNav>();
-  const { vendorId, currentVendor } = useVendorIds();
-  const Screen = useLazyScreen(() => require('../screens/VendorProfileScreen'));
-  // Prefer stable id so Profile does not remount-fetch when context fills in
-  const stableId = currentVendor?.id || vendorId || 'me';
-  return (
-    <Screen
-      key="vendor-self-profile"
-      vendorId={stableId}
-      self
-      initialTab="info"
-      onNavigate={(screen: string, params?: any) => {
-        if (screen === 'goBack') navigation.navigate('VendorTabs', { screen: 'Home' });
-        else navigation.navigate(screen as any, params);
-      }}
-    />
-  );
+  const Screen = useLazyScreen(() => require('../screens/VendorStudioProfileScreen'));
+  return <Screen />;
 }
 
 function VendorTabBar({ state, navigation }: BottomTabBarProps) {
@@ -147,7 +133,6 @@ function VendorTabBar({ state, navigation }: BottomTabBarProps) {
         const isFocused = state.index === index;
         const name = route.name as VendorTabName;
         const config = TAB_ICONS[name] || { active: 'ellipse', inactive: 'ellipse-outline', label: name };
-        const isCenter = name === 'Offers';
 
         const onPress = () => {
           const event = navigation.emit({
@@ -160,33 +145,15 @@ function VendorTabBar({ state, navigation }: BottomTabBarProps) {
           }
         };
 
-        if (isCenter) {
-          return (
-            <TouchableOpacity key={route.key} style={styles.centerButtonWrap} onPress={onPress} activeOpacity={0.9}>
-              <View style={[styles.centerButton, isFocused && styles.centerButtonActive]}>
-                <Icon
-                  name={isFocused ? config.active : config.inactive}
-                  size={24}
-                  color="#FFF9F2"
-                />
-              </View>
-              <Text style={[styles.tabLabel, { color: isFocused ? '#63300E' : '#8B7355', marginTop: 2, fontWeight: '700' }]}>
-                {config.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        }
-
         return (
           <TouchableOpacity key={route.key} style={styles.tabItem} onPress={onPress} activeOpacity={0.85}>
-            <View style={styles.tabContentInner}>
-              <Icon
-                name={isFocused ? config.active : config.inactive}
-                size={22}
-                color={isFocused ? '#B9834B' : '#8B7355'}
-              />
-              <Text style={[styles.tabLabel, { color: isFocused ? '#B9834B' : '#8B7355' }]}>{config.label}</Text>
-            </View>
+            <Icon
+              name={isFocused ? config.active : config.inactive}
+              size={21}
+              color={isFocused ? '#A67C52' : '#8B7355'}
+            />
+            <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>{config.label}</Text>
+            {isFocused ? <View style={styles.tabIndicator} /> : null}
           </TouchableOpacity>
         );
       })}
@@ -212,65 +179,41 @@ export default function VendorTabs() {
 const styles = StyleSheet.create({
   customTabBar: {
     position: 'absolute',
-    left: VendorUI.space.screen,
-    right: VendorUI.space.screen,
-    borderRadius: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: VendorUI.space.sm,
+    left: 18,
+    right: 18,
     height: VENDOR_TAB_BAR_HEIGHT,
-    backgroundColor: VendorUI.colors.surface,
+    borderRadius: VendorUI.radius.tabBar,
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderColor: '#E9D4BE',
     borderWidth: 1,
-    borderColor: VendorUI.colors.border,
-    shadowColor: 'rgba(185, 131, 75, 0.35)',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowColor: '#63300E',
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 8,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: '100%',
-  },
-  tabContentInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    paddingTop: 4,
+    gap: 3,
+    minHeight: MIN_TOUCH,
   },
   tabLabel: {
     fontSize: 10,
-    marginTop: 4,
-    textAlign: 'center',
-    fontWeight: '600',
+    color: '#8B7355',
+    fontWeight: '700',
   },
-  centerButtonWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
+  tabLabelActive: {
+    color: '#A67C52',
   },
-  centerButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#63300E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: -14,
-    borderWidth: 3,
-    borderColor: '#FBEFE2',
-    shadowColor: '#63300E',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  centerButtonActive: {
-    backgroundColor: '#B9834B',
-    borderColor: '#FFF9F2',
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 6,
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#A67C52',
   },
 });

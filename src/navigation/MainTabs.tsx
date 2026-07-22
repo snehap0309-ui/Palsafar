@@ -5,6 +5,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  MAIN_TAB_BAR_HEIGHT,
+  MAIN_TAB_FAB_OVERHANG,
+  MAIN_TAB_BAR_BOTTOM_GAP,
+} from '../design/tabBarLayout';
+import { MIN_TOUCH } from '../design/responsive';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, RootStackParamList } from './types';
 import { useUserContext } from '../context/UserContext';
@@ -246,12 +252,10 @@ function ProfileTabWrapper({ places }: { places: TouristSpot[] }) {
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const bottom = Math.max(insets.bottom, MAIN_TAB_BAR_BOTTOM_GAP);
 
   return (
-    <View style={[
-      styles.customTabBar,
-      { bottom: Math.max(insets.bottom, 12) }
-    ]}>
+    <View style={[styles.customTabBar, { bottom, height: MAIN_TAB_BAR_HEIGHT }]}>
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const name = route.name as TabName;
@@ -274,8 +278,16 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
         if (name === 'Map') {
           return (
-            <TouchableOpacity key={route.key} onPress={onPress} style={styles.centerButtonWrap} activeOpacity={0.9}>
-              <View style={styles.centerButton}>
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={styles.centerButtonWrap}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Map"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={[styles.centerButton, { top: -MAIN_TAB_FAB_OVERHANG }]}>
                 <Icon name="map" size={26} color="#FFF9F2" />
               </View>
               <Text style={styles.centerLabel}>Map</Text>
@@ -284,7 +296,15 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         }
 
         return (
-          <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={styles.tabItem}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={config.label}
+            accessibilityState={{ selected: isFocused }}
+          >
             <View style={styles.tabContentInner}>
               <Icon name={iconName} size={22} color={color} />
               <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
@@ -372,7 +392,7 @@ export default function MainTabs() {
     return () => { fetchGenRef.current += 1; };
   }, [lat, lng]);
 
-  // Ask for location once Home is on-screen (after Splash), not during splash flash
+  // Ask for location once Home is on-screen, not during early boot
   useEffect(() => {
     const t = setTimeout(() => {
       requestPermission().catch(() => {});
@@ -430,7 +450,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
-    height: 64,
+    height: MAIN_TAB_BAR_HEIGHT,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: 'rgba(200, 155, 60, 0.15)',
@@ -445,6 +465,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
+    minHeight: MIN_TOUCH,
   },
   tabContentInner: {
     alignItems: 'center',
@@ -464,6 +485,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     height: '100%',
     paddingTop: 0,
+    minHeight: MIN_TOUCH,
   },
   centerButton: {
     width: 58,
@@ -472,7 +494,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#63300E',
     justifyContent: 'center',
     alignItems: 'center',
-    top: -18,
     borderWidth: 3,
     borderColor: '#FFFFFF',
     shadowColor: '#63300E',

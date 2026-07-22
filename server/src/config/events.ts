@@ -55,7 +55,7 @@ eventBus.on(AppEvents.PLACE_APPROVED, async (payload: {
     await withRetry(() => notificationService.sendToUser(
       payload.submitterId,
       'Hidden Gem Approved!',
-      `${placeName} has been approved and is now visible to all explorers.`,
+      `${placeName} has been approved and is now visible to all travelers.`,
       { placeId: payload.placeId, type: 'hidden_gem_approved' },
       'hidden_gem_approved',
     )).catch((err) => {

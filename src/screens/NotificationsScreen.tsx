@@ -2,8 +2,9 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshCon
 import { useState, useCallback, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { notificationService } from '../services/notificationService';
+import { navigateFromInAppNotification } from '../services/notifications/notificationNavigation';
 import type { InAppNotification } from '../services/api/notifications';
-
+import { useHeaderSafePadding, useBottomSafePadding } from '../design/responsive';
 const filters = ['All', 'Unread', 'Payments', 'Offers', 'System'] as const;
 
 function matchesFilter(n: InAppNotification, filter: string) {
@@ -29,6 +30,8 @@ function timeAgo(iso: string) {
 
 export default function NotificationsScreen({ onBack }: { onBack?: () => void }) {
   const { theme } = useTheme();
+  const headerPadTop = useHeaderSafePadding(12);
+  const bottomPad = useBottomSafePadding(24);
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [filter, setFilter] = useState<(typeof filters)[number]>('All');
   const [loading, setLoading] = useState(true);
@@ -65,6 +68,7 @@ export default function NotificationsScreen({ onBack }: { onBack?: () => void })
       await notificationService.markAsRead(n.id);
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
     }
+    navigateFromInAppNotification(n);
   }, []);
 
   const filtered = notifications.filter((n) => matchesFilter(n, filter));
@@ -77,7 +81,7 @@ export default function NotificationsScreen({ onBack }: { onBack?: () => void })
         <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={theme.primary} />
       }
     >
-      <View style={{ padding: 24, paddingTop: 56, gap: 24 }}>
+      <View style={{ padding: 24, paddingTop: headerPadTop, paddingBottom: bottomPad, gap: 24 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             {onBack && (

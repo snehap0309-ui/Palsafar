@@ -69,6 +69,7 @@ interface ProfileScreenProps {
   onLogout?: () => void;
   onAdminVerification?: () => void;
   onAdminHiddenGemReview?: () => void;
+  onAdminPlacesReview?: () => void;
   onOpenCredits?: () => void;
   onNavigateToWallet?: () => void;
   onNavigateToRewards?: () => void;
@@ -97,6 +98,7 @@ export default function ProfileScreen({
   onLogout,
   onAdminVerification,
   onAdminHiddenGemReview,
+  onAdminPlacesReview,
   onNavigateToWallet,
   onNavigateToRewards,
   onRewardsWallet,
@@ -571,6 +573,59 @@ export default function ProfileScreen({
         activeMode={contextUser.activeMode || user.activeMode || 'USER'}
         onSwitchMode={onSwitchRole}
       />
+
+      {roles.includes('ADMIN') && (onAdminVerification || onAdminHiddenGemReview || onAdminPlacesReview) ? (
+        <View style={{ paddingHorizontal: 20, paddingBottom: 24, gap: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 4 }}>
+            Admin moderation
+          </Text>
+          {onAdminVerification ? (
+            <TouchableOpacity
+              style={[styles.adminCard, { backgroundColor: theme.surface }]}
+              onPress={onAdminVerification}
+            >
+              <View style={[styles.adminCardIcon, { backgroundColor: COLORS.primary + '18' }]}>
+                <Icon name="storefront-outline" size={22} color={COLORS.primary} />
+              </View>
+              <View style={styles.adminInfo}>
+                <Text style={[styles.adminTitle, { color: theme.text }]}>Vendor verification</Text>
+                <Text style={[styles.adminDesc, { color: theme.textSecondary }]}>Approve or reject vendor applications</Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color={theme.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+          {onAdminHiddenGemReview ? (
+            <TouchableOpacity
+              style={[styles.adminCard, { backgroundColor: theme.surface }]}
+              onPress={onAdminHiddenGemReview}
+            >
+              <View style={[styles.adminCardIcon, { backgroundColor: COLORS.primary + '18' }]}>
+                <Icon name="diamond-outline" size={22} color={COLORS.primary} />
+              </View>
+              <View style={styles.adminInfo}>
+                <Text style={[styles.adminTitle, { color: theme.text }]}>Hidden gems</Text>
+                <Text style={[styles.adminDesc, { color: theme.textSecondary }]}>Review community place submissions</Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color={theme.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+          {onAdminPlacesReview ? (
+            <TouchableOpacity
+              style={[styles.adminCard, { backgroundColor: theme.surface }]}
+              onPress={onAdminPlacesReview}
+            >
+              <View style={[styles.adminCardIcon, { backgroundColor: COLORS.primary + '18' }]}>
+                <Icon name="map-outline" size={22} color={COLORS.primary} />
+              </View>
+              <View style={styles.adminInfo}>
+                <Text style={[styles.adminTitle, { color: theme.text }]}>Places review</Text>
+                <Text style={[styles.adminDesc, { color: theme.textSecondary }]}>Approve curated place listings</Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color={theme.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
       </View>
 
       {/* Edit Profile Modal */}
@@ -828,7 +883,7 @@ export default function ProfileScreen({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   profileBody: { flex: 1 },
-  roleSwitcher: { backgroundColor: '#FFF9F2', paddingTop: 44, paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(200,155,60,0.15)' },
+  roleSwitcher: { backgroundColor: '#FFF9F2', paddingTop: 0, paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(200,155,60,0.15)' },
   roleSwitcherLabel: { color: '#8B7355', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 7 },
   roleChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   roleChoice: { borderWidth: 1, borderColor: '#D9B88C', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: '#FBEFE2' },
@@ -840,7 +895,7 @@ const styles = StyleSheet.create({
 
   // Hero Section
   heroSection: {
-    paddingTop: 36,
+    paddingTop: 0,
     paddingBottom: 10,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 18,

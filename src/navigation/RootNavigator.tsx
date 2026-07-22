@@ -20,6 +20,48 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 
 import { useLazyScreen } from '../utils/useLazyScreen';
 import OfflineBanner from '../components/OfflineBanner';
+import { navigationRef } from './navigationRef';
+import {
+  navigationIntegration,
+  trackScreen,
+  isMonitoringEnabled,
+} from '../services/monitoring';
+import { MONITORING_CONFIG } from '../config/monitoringConfig';
+import type { NavigationState, PartialState } from '@react-navigation/native';
+
+function getActiveRouteName(
+  state: NavigationState | PartialState<NavigationState> | undefined,
+): string | undefined {
+  if (!state || !state.routes?.length) return undefined;
+  const index = state.index ?? state.routes.length - 1;
+  const route = state.routes[index];
+  if (route.state) return getActiveRouteName(route.state as NavigationState);
+  return route.name;
+}
+
+function MonitoredNavigation({ children, linkingConfig }: { children: React.ReactNode; linkingConfig?: typeof linking }) {
+  return (
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linkingConfig}
+      onReady={() => {
+        if (isMonitoringEnabled()) {
+          navigationIntegration.registerNavigationContainer(navigationRef);
+        }
+        const name = getActiveRouteName(navigationRef.getRootState());
+        if (name) trackScreen(name);
+        const { flushPendingNotificationRoute } = require('../services/notifications/notificationNavigation');
+        flushPendingNotificationRoute();
+      }}
+      onStateChange={(state) => {
+        const name = getActiveRouteName(state);
+        if (name) trackScreen(name);
+      }}
+    >
+      {children}
+    </NavigationContainer>
+  );
+}
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -205,7 +247,14 @@ function RazorpayCheckoutWrapper({ route, navigation }: any) {
 function AdminVerificationWrapper({ navigation }: any) {
   const { onLogout } = useUserContext();
   const Screen = useLazyScreen(() => require('../screens/AdminVendorVerificationScreen'));
-  return <Screen onBack={() => navigation.goBack()} onLogout={onLogout} />;
+  return (
+    <Screen
+      onBack={() => navigation.goBack()}
+      onLogout={onLogout}
+      onNavigateHiddenGems={() => navigation.navigate('AdminHiddenGemReview')}
+      onNavigatePlaces={() => navigation.navigate('AdminPlacesReview')}
+    />
+  );
 }
 
 function AdminGemReviewWrapper({ navigation }: any) {
@@ -257,11 +306,6 @@ function QuestWrapper({ navigation, route }: any) {
       initialTab={route.params?.tab || 'explore'}
     />
   );
-}
-
-function TravelPassportWrapper({ navigation }: any) {
-  const Screen = useLazyScreen(() => require('../screens/TravelPassportScreen'));
-  return <Screen onBack={() => navigation.goBack()} />;
 }
 
 function WalletWrapper({ navigation }: any) {
@@ -478,6 +522,16 @@ function SettingsWrapper({ navigation }: any) {
   return <Screen navigation={navigation} />;
 }
 
+function CrashTestWrapper({ navigation }: any) {
+  const Screen = useLazyScreen(() => require('../screens/CrashTestScreen'));
+  return <Screen navigation={navigation} />;
+}
+
+function DevNotificationTestWrapper({ navigation }: any) {
+  const Screen = useLazyScreen(() => require('../screens/DevNotificationTestScreen'));
+  return <Screen navigation={navigation} />;
+}
+
 function VendorSettingsWrapper() {
   const Screen = useLazyScreen(() => require('../screens/VendorSettingsScreen'));
   return <Screen />;
@@ -636,7 +690,6 @@ const sharedStackScreens = (
     <Stack.Screen name="VendorAnalytics" component={VendorAnalyticsWrapper} />
     <Stack.Screen name="Memories" component={MemoriesWrapper} />
     <Stack.Screen name="TreasureHunt" component={TreasureHuntWrapper} />
-    <Stack.Screen name="TravelPassport" component={TravelPassportWrapper} />
     <Stack.Screen name="Quest" component={QuestWrapper} />
     <Stack.Screen name="CreateReel" component={CreateReelWrapper} />
     <Stack.Screen name="ReelDetail" component={ReelDetailWrapper} />
@@ -645,6 +698,12 @@ const sharedStackScreens = (
     <Stack.Screen name="CreatorAnalytics" component={CreatorAnalyticsWrapper} />
     <Stack.Screen name="Credits" component={CreditsWrapper} />
     <Stack.Screen name="Settings" component={SettingsWrapper} />
+    {MONITORING_CONFIG.enableCrashTests ? (
+      <Stack.Screen name="CrashTest" component={CrashTestWrapper} options={{ headerShown: false }} />
+    ) : null}
+    {MONITORING_CONFIG.enableNotificationTests ? (
+      <Stack.Screen name="DevNotificationTest" component={DevNotificationTestWrapper} options={{ headerShown: false }} />
+    ) : null}
     <Stack.Screen name="ChangePassword" component={ChangePasswordWrapper} />
     <Stack.Screen name="DeleteAccount" component={DeleteAccountWrapper} />
     <Stack.Screen name="Notifications" component={NotificationsWrapper} />
@@ -745,7 +804,6 @@ export default function RootNavigator() {
   const [splashDone, setSplashDone] = useState(false);
   /** null = still reading AsyncStorage — must NOT treat as "show onboarding" */
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
-  const [justOnboarded, setJustOnboarded] = useState(false);
   const shellMode = resolveShellMode(user);
 
   // Load onboarding flag as early as possible (do not wait for splash)
@@ -798,13 +856,13 @@ export default function RootNavigator() {
 
   if (isAuthenticated) {
     return (
-      <NavigationContainer linking={linking}>
+      <MonitoredNavigation linkingConfig={linking}>
         <StatusBar barStyle="dark-content" backgroundColor={theme.background} />
         <View style={{ flex: 1 }}>
           <OfflineBanner />
           <AuthenticatedStack mode={shellMode} />
         </View>
-      </NavigationContainer>
+      </MonitoredNavigation>
     );
   }
 
@@ -814,7 +872,6 @@ export default function RootNavigator() {
       <OnboardingScreen
         onDone={async () => {
           await setOnboardingCompleted();
-          setJustOnboarded(true);
           setOnboardingDone(true);
         }}
       />
@@ -822,10 +879,10 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer linking={linking}>
+    <MonitoredNavigation linkingConfig={linking}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.background} />
-      <AuthNavigator initialRoute={justOnboarded ? 'Signup' : 'Login'} />
-    </NavigationContainer>
+      <AuthNavigator initialRoute="Login" />
+    </MonitoredNavigation>
   );
 }
 

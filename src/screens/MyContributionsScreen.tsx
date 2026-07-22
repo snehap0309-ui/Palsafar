@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 
 import { colors, spacing, borderRadius } from '../config/theme';
 import { MaterialIcons } from '../utils/Icons';
 import { HiddenGemSubmission } from '../types';
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface MyContributionsScreenProps {
   onBack: () => void;
@@ -12,6 +13,7 @@ interface MyContributionsScreenProps {
 }
 
 export default function MyContributionsScreen({ onBack, userId, submissions, onAddNew }: MyContributionsScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const mySubmissions = useMemo(() => 
     submissions.filter(s => s.userId === userId).sort((a, b) => b.submittedAt - a.submittedAt),
     [submissions, userId]
@@ -51,7 +53,7 @@ export default function MyContributionsScreen({ onBack, userId, submissions, onA
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity onPress={onBack}>
           <MaterialIcons name="arrow-back" size={24} color={colors.primaryLight} />
         </TouchableOpacity>
@@ -136,7 +138,7 @@ export default function MyContributionsScreen({ onBack, userId, submissions, onA
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: spacing.xl },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: 0 },
   title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
   addButton: { padding: spacing.xs },
   content: { flex: 1, padding: spacing.lg },

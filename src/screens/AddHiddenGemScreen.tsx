@@ -9,6 +9,7 @@ import { uploadApi } from '../services/api/upload';
 import { apiClient } from '../services/api/client';
 import { useUserContext } from '../context/UserContext';
 import * as ImagePicker from 'react-native-image-picker';
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface AddHiddenGemScreenProps {
   onBack: () => void;
@@ -154,6 +155,7 @@ const PERIOD_TIME_DEFAULTS: Record<string, { from: string; to: string }> = {
 };
 
 export default function AddHiddenGemScreen({ onBack, onSubmit, userId, userName }: AddHiddenGemScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const { isGuest, onLogout } = useUserContext();
   const [placeName, setPlaceName] = useState('');
   const [category, setCategory] = useState<HiddenGemCategory | null>(null);
@@ -391,7 +393,7 @@ export default function AddHiddenGemScreen({ onBack, onSubmit, userId, userName 
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity onPress={onBack}>
           <MaterialIcons name="arrow-back" size={24} color={colors.primaryLight} />
         </TouchableOpacity>
@@ -656,7 +658,7 @@ export default function AddHiddenGemScreen({ onBack, onSubmit, userId, userName 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: spacing.xl },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: 0 },
   title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
   content: { flex: 1, padding: spacing.lg, paddingTop: 0 },
   signInBanner: {

@@ -5,11 +5,14 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { useTheme } from '../context/ThemeContext';
 import { authApi } from '../services/api/auth';
 import { useUserContext } from '../context/UserContext';
+import { useHeaderSafePadding, useBottomSafePadding } from '../design/responsive';
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,128}$/;
 
 export default function ChangePasswordScreen({ navigation }: { navigation?: any }) {
   const { theme } = useTheme();
+  const headerPadTop = useHeaderSafePadding(12);
+  const scrollPadBottom = useBottomSafePadding(24);
   const { onLogout } = useUserContext();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -60,7 +63,7 @@ export default function ChangePasswordScreen({ navigation }: { navigation?: any 
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ padding: Pal.spacing[5], paddingTop: 56, gap: Pal.spacing[5] }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: Pal.spacing[5], paddingTop: headerPadTop, paddingBottom: scrollPadBottom, gap: Pal.spacing[5] }} keyboardShouldPersistTaps="handled">
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <TouchableOpacity onPress={() => navigation?.goBack()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.glass, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={{ color: theme.text, fontSize: 20 }}>←</Text>

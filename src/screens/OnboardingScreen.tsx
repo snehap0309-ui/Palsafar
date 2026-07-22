@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Dimensions, Animated,
+  View, Text, StyleSheet, Animated,
   TouchableOpacity, StatusBar, Platform, ScrollView, Image,
+  useWindowDimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MIN_TOUCH } from '../design/responsive';
 
-const { width: W, height: H } = Dimensions.get('window');
 const IS_IOS = Platform.OS === 'ios';
-const TOP_SAFE = IS_IOS ? 54 : (StatusBar.currentHeight || 24) + 8;
-const BOTTOM_SAFE = IS_IOS ? 34 : 16;
 
 const C = {
   bg: '#FFF9F2',
@@ -40,7 +40,19 @@ const SLIDES = [
   },
 ];
 
-function SlideContent({ slide, isActive, index }: { slide: typeof SLIDES[0]; isActive: boolean; index: number }) {
+function SlideContent({
+  slide,
+  isActive,
+  index,
+  width,
+  height,
+}: {
+  slide: typeof SLIDES[0];
+  isActive: boolean;
+  index: number;
+  width: number;
+  height: number;
+}) {
   const fadeIn = useRef(new Animated.Value(0)).current;
   const titleUp = useRef(new Animated.Value(30)).current;
   const subUp = useRef(new Animated.Value(20)).current;
@@ -61,7 +73,7 @@ function SlideContent({ slide, isActive, index }: { slide: typeof SLIDES[0]; isA
       Animated.spring(titleUp, { toValue: 0, tension: 80, friction: 14, useNativeDriver: true }),
       Animated.spring(subUp, { toValue: 0, tension: 60, friction: 12, useNativeDriver: true }),
     ]).start();
-  }, [isActive]);
+  }, [isActive, fadeIn, titleUp, subUp]);
 
   const titleParts = slide.title.split(' ');
   const highlightIdx = index === 0 ? 1 : 0;
@@ -69,10 +81,10 @@ function SlideContent({ slide, isActive, index }: { slide: typeof SLIDES[0]; isA
   return (
     <Animated.View
       style={{
-        width: W,
+        width,
         alignItems: 'center',
         opacity: fadeIn,
-        paddingTop: H * 0.12,
+        paddingTop: height * 0.12,
       }}
       pointerEvents="none"
     >
@@ -119,6 +131,11 @@ function SlideContent({ slide, isActive, index }: { slide: typeof SLIDES[0]; isA
 }
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
+  const insets = useSafeAreaInsets();
+  const { width: W, height: H } = useWindowDimensions();
+  const topSafe = Math.max(insets.top, IS_IOS ? 12 : 8);
+  const bottomSafe = Math.max(insets.bottom, IS_IOS ? 16 : 12);
+
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const doneOnceRef = useRef(false);
@@ -137,7 +154,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       pageRef.current = newPage;
       setPage(newPage);
     }
-  }, []);
+  }, [W]);
 
   const goNext = useCallback(() => {
     const current = pageRef.current;
@@ -149,7 +166,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     pageRef.current = next;
     setPage(next);
     scrollRef.current?.scrollTo({ x: next * W, animated: true });
-  }, [finishOnboarding]);
+  }, [finishOnboarding, W]);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -168,17 +185,21 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
           onPress={finishOnboarding}
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding"
           style={{
             position: 'absolute',
-            top: TOP_SAFE - 6,
+            top: topSafe - 6,
             right: 16,
             zIndex: 10,
+            minHeight: MIN_TOUCH,
             paddingVertical: 6,
             paddingHorizontal: 16,
             borderRadius: 16,
             backgroundColor: C.surface,
             borderWidth: 1,
             borderColor: C.border,
+            justifyContent: 'center',
           }}
         >
           <Text style={{ color: C.textSub, fontSize: 14, fontWeight: '600' }}>Skip</Text>
@@ -195,16 +216,15 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
         bounces={false}
         decelerationRate="fast"
         style={{ flex: 1 }}
-        // Never finish onboarding from scroll alone
       >
         {SLIDES.map((slide, i) => (
           <View key={i} style={{ width: W, justifyContent: 'flex-start' }}>
-            <SlideContent slide={slide} isActive={page === i} index={i} />
+            <SlideContent slide={slide} isActive={page === i} index={i} width={W} height={H} />
           </View>
         ))}
       </ScrollView>
 
-      <View style={{ paddingHorizontal: 32, paddingBottom: BOTTOM_SAFE + 20, paddingTop: 8 }}>
+      <View style={{ paddingHorizontal: 32, paddingBottom: bottomSafe + 20, paddingTop: 8 }}>
         <View
           style={{
             flexDirection: 'row',
@@ -230,8 +250,10 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
         <TouchableOpacity
           onPress={goNext}
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={page === SLIDES.length - 1 ? 'Get started' : 'Next'}
           style={{
-            height: 48,
+            height: Math.max(48, MIN_TOUCH),
             borderRadius: 26,
             alignItems: 'center',
             justifyContent: 'center',

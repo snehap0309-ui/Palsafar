@@ -66,7 +66,7 @@ export default function ForgotPasswordScreen({ onBack, onResetPassword }: Forgot
 
   if (step === 'success') {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         <View style={styles.successContainer}>
           <View style={styles.iconCircle}>
@@ -86,7 +86,7 @@ export default function ForgotPasswordScreen({ onBack, onResetPassword }: Forgot
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={step === 'code' ? () => setStep('email') : onBack}>

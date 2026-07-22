@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const registerDeviceTokenSchema = z.object({
   token: z.string().min(1),
   platform: z.enum(['ios', 'android', 'web', 'unknown']).optional(),
+  appVersion: z.string().max(32).optional(),
+  buildNumber: z.string().max(32).optional(),
 });
 
 export const unregisterDeviceTokenSchema = z.object({

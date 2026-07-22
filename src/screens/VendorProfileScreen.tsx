@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, Linking, Share, Alert, ActivityIndicator, RefreshControl, Platform, Switch, StatusBar, StyleSheet, Modal, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, Share, Alert, ActivityIndicator, RefreshControl, Platform, Switch, StatusBar, StyleSheet, Modal, TextInput, useWindowDimensions } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,10 +16,8 @@ import { useVendorScreenInsets, VendorUI } from '../design/vendorLayout';
 import ProfileModeSwitcher from '../components/ProfileModeSwitcher';
 import type { UserActiveMode } from '../types';
 
-const { width } = Dimensions.get('window');
 const CARD_GAP = VendorUI.space.md;
 const H_PAD = VendorUI.space.screen;
-const CARD_WIDTH = (width - H_PAD * 2 - CARD_GAP) / 2;
 const COVER_HEIGHT = 160;
 const AVATAR_SIZE = 92;
 const AVATAR_RING = 4;
@@ -82,6 +80,8 @@ export default function VendorProfileScreen({
   const { updateVendorProfile, currentVendor, vendorOffers } = useDataContext();
   const { user, setActiveMode, isGuest } = useUserContext();
   const screenInsets = useVendorScreenInsets({ withTabBar: self });
+  const { width } = useWindowDimensions();
+  const CARD_WIDTH = (width - H_PAD * 2 - CARD_GAP) / 2;
   const [vendor, setVendor] = useState<VendorPublicDetails | null>(null);
   const [status, setStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | null>(null);
   const [reels, setReels] = useState<VendorReel[]>([]);
@@ -657,7 +657,7 @@ export default function VendorProfileScreen({
                     <Text style={{ fontSize: 22 }}>{PRESET_AVATARS[item.user?.avatarStyle ?? 0] || '🧭'}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontFamily: Pal.typography.fontFamily.semibold, fontSize: 13, color: Pal.colors.light.text }}>
-                        {item.user?.name || 'Explorer'}
+                        {item.user?.name || 'Traveler'}
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 2, marginTop: 2 }}>
                         {[1, 2, 3, 4, 5].map((s) => (

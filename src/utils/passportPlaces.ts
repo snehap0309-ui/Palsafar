@@ -24,7 +24,7 @@ function normalizePlace(
     name: input.name || 'Place',
     city: (input.city || '').trim() || 'Unknown',
     state: (input.state || '').trim() || 'Unknown',
-    category: input.category,
+    category: input.category || 'general',
     isHiddenGem: !!(input.isHiddenGem || input.category?.toLowerCase() === 'hidden_gem'),
     source,
     slug: (input as any).slug || undefined,

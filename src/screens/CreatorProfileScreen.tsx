@@ -6,11 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Dimensions,
   ActivityIndicator,
   Alert,
   StatusBar,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
@@ -20,9 +20,7 @@ import { CreatorProfile } from '../types';
 import { socialApi } from '../services/api';
 import { DEV_FLAGS } from '../config/devFlags';
 import { GridSkeleton } from '../components/reels/GridSkeleton';
-
-const { width: WINDOW_WIDTH } = Dimensions.get('window');
-const GRID_ITEM_SIZE = (WINDOW_WIDTH - 4) / 3;
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface CreatorProfileScreenProps {
   username: string;
@@ -46,6 +44,9 @@ export default function CreatorProfileScreen({
   const navigation = useNavigation<any>();
   const { theme } = useTheme();
   const { user } = useUserContext();
+  const { width: WINDOW_WIDTH } = useWindowDimensions();
+  const GRID_ITEM_SIZE = (WINDOW_WIDTH - 4) / 3;
+  const headerPadTop = useHeaderSafePadding();
 
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,7 +183,7 @@ export default function CreatorProfileScreen({
       <StatusBar barStyle="light-content" backgroundColor={theme.background} />
       
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: headerPadTop }]}>
         <TouchableOpacity style={styles.backBtn} onPress={handleBackPress}>
           <Icon name="chevron-back" size={24} color={theme.text} />
         </TouchableOpacity>
@@ -303,7 +304,7 @@ export default function CreatorProfileScreen({
             {profile.reels.map((reel, index) => (
               <TouchableOpacity
                 key={reel.id}
-                style={styles.gridCell}
+                style={[styles.gridCell, { width: GRID_ITEM_SIZE, height: GRID_ITEM_SIZE * 1.3 }]}
                 onPress={() => handleReelPress(reel.id, index)}
               >
                 {reel.thumbnail ? (
@@ -370,7 +371,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 56,
     paddingBottom: 16,
     borderBottomWidth: 1,
   },
@@ -539,8 +539,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 1,
   },
   gridCell: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE * 1.3,
     margin: 0.5,
     position: 'relative',
   },

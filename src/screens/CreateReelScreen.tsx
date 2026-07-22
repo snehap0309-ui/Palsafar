@@ -10,12 +10,14 @@ import {
   ActivityIndicator,
   Platform,
   Image,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserContext } from '../context/UserContext';
 import { useDataContext } from '../context/DataContext';
+import { useBottomSafePadding } from '../design/responsive';
 import { colors } from '../config/theme';
 import { Button } from '../components/ui';
 
@@ -41,6 +43,7 @@ export default function CreateReelScreen({
   const { user } = useUserContext();
   const { currentVendor } = useDataContext();
   const insets = useSafeAreaInsets();
+  const contentPadBottom = useBottomSafePadding(24);
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -137,7 +140,10 @@ export default function CreateReelScreen({
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
           <Icon name="close" size={28} color="#fff" />
@@ -156,7 +162,11 @@ export default function CreateReelScreen({
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: contentPadBottom }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Video Picker */}
         <TouchableOpacity style={styles.videoPicker} onPress={handlePickVideo}>
           {videoThumbnail ? (
@@ -220,7 +230,7 @@ export default function CreateReelScreen({
           </View>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

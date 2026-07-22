@@ -7,7 +7,6 @@ import {
   Modal,
   Animated,
   Easing,
-  Dimensions,
   Image,
   ScrollView,
   Alert,
@@ -16,9 +15,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { UserProfile } from '../types';
-
-const { width: SCREEN_W } = Dimensions.get('window');
-const SIDEBAR_W = Math.min(SCREEN_W * 0.88, 360);
+import { useSidebarWidth } from '../design/responsive';
 
 const C = {
   bg: '#FDFBF8',
@@ -116,16 +113,17 @@ export default function CreatorStudioSidebar({
   onLogout,
 }: CreatorStudioSidebarProps) {
   const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(-SIDEBAR_W)).current;
+  const sidebarW = useSidebarWidth();
+  const slideAnim = useRef(new Animated.Value(-sidebarW)).current;
 
   useEffect(() => {
     Animated.timing(slideAnim, {
-      toValue: visible ? 0 : -SIDEBAR_W,
+      toValue: visible ? 0 : -sidebarW,
       duration: 280,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [visible, slideAnim]);
+  }, [visible, sidebarW, slideAnim]);
 
   const displayName = creatorName || user.displayName || 'Creator';
   const handle = creatorHandle || user.creatorProfile?.username || user.displayName?.toLowerCase().replace(/\s+/g, '') || 'creator';
@@ -205,7 +203,7 @@ export default function CreatorStudioSidebar({
           style={[
             styles.panel,
             {
-              width: SIDEBAR_W,
+              width: sidebarW,
               paddingTop: insets.top + 8,
               transform: [{ translateX: slideAnim }],
             },

@@ -124,7 +124,7 @@ const SAMPLE_REELS: Reel[] = [
     createdAt: new Date(Date.now() - 259200000).toISOString(),
     creator: {
       id: 'creator_vikram',
-      username: 'Vikram Explorer',
+      username: 'VikramTravels',
       avatar: null,
       verified: false,
       userId: 'user_vikram',

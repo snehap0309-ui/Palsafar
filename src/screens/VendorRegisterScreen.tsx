@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useBottomSafePadding } from '../design/responsive';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useDataContext } from '../context/DataContext';
 import { useUserContext } from '../context/UserContext';
@@ -69,6 +70,7 @@ function formatCategory(cat: string) {
 }
 
 export default function VendorRegisterScreen({ onBack }: VendorRegisterScreenProps) {
+  const bottomPad = useBottomSafePadding(24);
   const { registerVendor, currentVendor } = useDataContext();
   const { user, isAuthenticated } = useUserContext();
   const isResubmission = currentVendor?.verificationStatus === 'rejected' || currentVendor?.verificationStatus === 'changes_requested';
@@ -272,7 +274,7 @@ export default function VendorRegisterScreen({ onBack }: VendorRegisterScreenPro
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -539,7 +541,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: 20 },
   appNotice: {
     flexDirection: 'row',
     alignItems: 'center',

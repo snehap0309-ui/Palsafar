@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, Animated } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { height: WINDOW_HEIGHT, width: WINDOW_WIDTH } = Dimensions.get('window');
-
 export const ReelSkeleton: React.FC = React.memo(() => {
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0.3)).current;
 
@@ -30,7 +29,7 @@ export const ReelSkeleton: React.FC = React.memo(() => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: windowHeight, width: windowWidth }]}>
       <Animated.View style={[styles.shimmer, animatedStyle]} />
       
       {/* Right Side Actions */}
@@ -58,8 +57,6 @@ export const ReelSkeleton: React.FC = React.memo(() => {
 
 const styles = StyleSheet.create({
   container: {
-    height: WINDOW_HEIGHT,
-    width: WINDOW_WIDTH,
     backgroundColor: '#111',
     position: 'relative',
   },

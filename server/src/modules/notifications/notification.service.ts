@@ -4,16 +4,71 @@ import { logger } from '../../config/logger';
 import { getMessagingInstance, isFirebaseReady } from '../../config/firebase';
 import { ApiError } from '../../shared/utils/ApiError';
 
+const PERMANENT_FCM_ERRORS = new Set([
+  'messaging/invalid-registration-token',
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-argument',
+]);
+
+function resolveAndroidChannel(type?: string): string {
+  const t = String(type || 'system').toLowerCase();
+  if (/reward|points|redeem/.test(t)) return 'rewards';
+  if (/vendor|redemption|scanner/.test(t)) return 'vendor';
+  if (/creator|reel/.test(t)) return 'creator';
+  if (/trip|itinerary|planner/.test(t)) return 'trips';
+  if (/offer/.test(t)) return 'offers';
+  if (/marketing|promo|announce/.test(t)) return 'marketing';
+  if (/system|admin|account|legal/.test(t)) return 'system';
+  return 'default';
+}
+
+function enrichPushData(
+  type: string,
+  data?: Record<string, unknown>,
+  notificationId?: string,
+): Record<string, string> {
+  const base = data ? { ...data } : {};
+  const t = type || String(base.type || 'system');
+  const entityId = base.entityId || base.placeId || base.tripId || base.reelId || base.vendorId || base.offerId;
+
+  const screenMap: Record<string, string> = {
+    hidden_gem_approved: 'SpotDetail',
+    hidden_gem_rejected: 'MyContributions',
+    points_earned: 'Wallet',
+    points_spent: 'Wallet',
+    offer_approved: 'VendorOffers',
+    offer_rejected: 'VendorOffers',
+    redemption_created: 'VendorRedemption',
+    redemption_verified: 'Rewards',
+    reel_comment: 'ReelDetail',
+  };
+
+  const screen = base.screen || screenMap[t] || 'Notifications';
+  const payload: Record<string, string> = {
+    type: String(t),
+    screen: String(screen),
+  };
+  if (entityId) payload.entityId = String(entityId);
+  if (notificationId) payload.notificationId = notificationId;
+  if (base.params) payload.params = typeof base.params === 'string' ? base.params : JSON.stringify(base.params);
+
+  for (const [k, v] of Object.entries(base)) {
+    if (v == null || k in payload) continue;
+    payload[k] = String(v);
+  }
+  return payload;
+}
+
 export const notificationService = {
   async registerDeviceToken(userId: string, token: string, platform: string = 'unknown') {
     const existing = await prisma.deviceToken.findUnique({ where: { token } });
     if (existing) {
-      if (existing.userId !== userId) {
+      if (existing.userId !== userId || existing.platform !== platform) {
         await prisma.deviceToken.update({
           where: { token },
           data: { userId, platform },
         });
-      } else if (existing.platform !== platform) {
+      } else {
         await prisma.deviceToken.update({
           where: { token },
           data: { platform },
@@ -61,11 +116,17 @@ export const notificationService = {
     });
 
     if (tokens.length > 0) {
+      const unreadCount = await prisma.inAppNotification.count({
+        where: { userId, read: false },
+      });
       this.sendPushToTokens(
         tokens.map((t) => t.token),
         title,
         body,
-        data,
+        { ...(data || {}), type },
+        type,
+        unreadCount,
+        notification.id,
       ).catch((err) => {
         logger.error({ err, userId }, 'Failed to send push notification');
       });
@@ -99,7 +160,8 @@ export const notificationService = {
         tokens.map((t) => t.token),
         title,
         body,
-        data,
+        { ...(data || {}), type },
+        type,
       ).catch((err) => {
         logger.error({ err, userIdCount: userIds.length }, 'Failed to send bulk push notification');
       });
@@ -132,18 +194,30 @@ export const notificationService = {
         tokens.map((t) => t.token),
         title,
         body,
-        data,
+        { ...(data || {}), type },
+        type,
       ).catch((err) => {
         logger.error({ err }, 'Failed to send broadcast push notification');
       });
     }
   },
 
-  async sendPushToTokens(tokens: string[], title: string, body?: string, data?: Record<string, unknown>) {
+  async sendPushToTokens(
+    tokens: string[],
+    title: string,
+    body?: string,
+    data?: Record<string, unknown>,
+    type: string = 'system',
+    badgeCount = 1,
+    notificationId?: string,
+  ) {
     if (!isFirebaseReady() || tokens.length === 0) return;
 
     const messaging = getMessagingInstance();
     if (!messaging) return;
+
+    const pushData = enrichPushData(type, data, notificationId);
+    const channelId = resolveAndroidChannel(type);
 
     const message: MulticastMessage = {
       tokens,
@@ -151,13 +225,11 @@ export const notificationService = {
         title,
         body: body || undefined,
       },
-      data: data ? Object.fromEntries(
-        Object.entries(data).map(([k, v]) => [k, String(v)]),
-      ) : undefined,
+      data: pushData,
       android: {
         priority: 'high',
         notification: {
-          channelId: 'default',
+          channelId,
           priority: 'high',
         },
       },
@@ -165,8 +237,9 @@ export const notificationService = {
         payload: {
           aps: {
             sound: 'default',
-            badge: 1,
+            badge: Math.max(1, badgeCount),
             contentAvailable: true,
+            category: type,
           },
         },
       },
@@ -176,9 +249,12 @@ export const notificationService = {
 
     if (response.failureCount > 0) {
       const failedTokens: string[] = [];
-      response.responses.forEach((resp: { success: boolean; error?: any }, idx: number) => {
+      response.responses.forEach((resp: { success: boolean; error?: { code?: string } }, idx: number) => {
         if (!resp.success) {
-          failedTokens.push(tokens[idx]);
+          const code = resp.error?.code || '';
+          if (PERMANENT_FCM_ERRORS.has(code)) {
+            failedTokens.push(tokens[idx]);
+          }
           logger.warn({ error: resp.error, token: '[REDACTED]' }, 'FCM send failed');
         }
       });
@@ -264,7 +340,7 @@ export const notificationService = {
     });
 
     if (tokens.length > 0) {
-      this.sendPushToTokens(tokens.map(t => t.token), title, body, data).catch((err) => {
+      this.sendPushToTokens(tokens.map(t => t.token), title, body, { ...(data || {}), type }, type).catch((err) => {
         logger.error({ err }, 'Failed to send state push notification');
       });
     }
@@ -294,7 +370,7 @@ export const notificationService = {
     });
 
     if (tokens.length > 0) {
-      this.sendPushToTokens(tokens.map(t => t.token), title, body, data).catch((err) => {
+      this.sendPushToTokens(tokens.map(t => t.token), title, body, { ...(data || {}), type }, type).catch((err) => {
         logger.error({ err }, 'Failed to send city push notification');
       });
     }
@@ -324,7 +400,7 @@ export const notificationService = {
     });
 
     if (tokens.length > 0) {
-      this.sendPushToTokens(tokens.map(t => t.token), title, body, data).catch((err) => {
+      this.sendPushToTokens(tokens.map(t => t.token), title, body, { ...(data || {}), type }, type).catch((err) => {
         logger.error({ err }, 'Failed to send category push notification');
       });
     }

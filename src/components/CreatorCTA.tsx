@@ -5,15 +5,12 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
   Animated,
   Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from '../utils/LinearGradient';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 40;
+import { useCardWidth } from '../design/responsive';
 
 interface CreatorCTAProps {
   onApply?: () => void;
@@ -22,6 +19,7 @@ interface CreatorCTAProps {
 }
 
 export default function CreatorCTA({ onApply, isSwitch = false }: CreatorCTAProps) {
+  const cardWidth = useCardWidth(40);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () => {
@@ -36,7 +34,7 @@ export default function CreatorCTA({ onApply, isSwitch = false }: CreatorCTAProp
       <Animated.View style={[styles.wrapper, { transform: [{ scale: scaleAnim }] }]}>
         <LinearGradient
           colors={['#FBEFE2', '#F5E6D0']}
-          style={styles.card}
+          style={[styles.card, { width: cardWidth }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
@@ -59,7 +57,7 @@ export default function CreatorCTA({ onApply, isSwitch = false }: CreatorCTAProp
               <Text style={styles.subtitle}>
                 {isSwitch
                   ? 'One professional role per account — switching retires your Vendor profile.'
-                  : 'Share travel stories, inspire explorers, and earn exclusive rewards.'}
+                  : 'Share travel stories, inspire travelers, and earn exclusive rewards.'}
               </Text>
 
               <View style={styles.featureList}>
@@ -112,7 +110,6 @@ const SHADOW = Platform.OS === 'ios'
 const styles = StyleSheet.create({
   wrapper: { borderRadius: 18 },
   card: {
-    width: CARD_WIDTH,
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,

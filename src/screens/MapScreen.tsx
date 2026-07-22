@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
-  Dimensions, ActivityIndicator, Platform,
+  ActivityIndicator, Platform,
   ScrollView, StatusBar, Linking, Alert, TextInput, Modal, Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Pal from '../design/DesignSystem';
+import { getMainTabBarClearance } from '../design/tabBarLayout';
+import { useResponsive } from '../design/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useDataContext } from '../context/DataContext';
@@ -42,7 +45,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tripsApi } from '../services/api/trips';
 import { recordSearchedPlace } from '../utils/passportPlaces';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 /** Street-level zoom for opening Map tab and GPS recenter (good for turn-by-turn context) */
 const MAP_TAB_ZOOM = 17;
 const MARKER_FOCUS_ZOOM = 16;
@@ -142,6 +144,9 @@ export default function MapScreen({
 }: MapScreenProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: _screenW, height: SCREEN_H } = useWindowDimensions();
+  const responsive = useResponsive();
+  const tabClearance = getMainTabBarClearance(insets.bottom);
   const { effectivePosition, requestPermission, hasPermission } = useLocationContext();
   const { vendors: contextVendors } = useDataContext();
   const { user, setUser, isGuest } = useUserContext();
@@ -1216,7 +1221,11 @@ export default function MapScreen({
     )} km`;
   }, [selectedMarker, effectivePosition, calculateDistance]);
 
-  const detailBottomInset = Platform.OS === 'ios' ? Math.max(insets.bottom, 12) + 88 : 88;
+  const detailBottomInset = Math.max(insets.bottom, 12) + tabClearance;
+  const controlsBottom = selectedMarker
+    ? detailBottomInset + Math.min(180, SCREEN_H * 0.22)
+    : tabClearance + 8;
+  const fetchingChipTop = insets.top + (responsive.isSmallPhone ? 118 : 152);
 
   const bgColor = '#FFF9F2';
   const cardBg = '#FBEFE2';
@@ -1290,7 +1299,7 @@ export default function MapScreen({
       )}
 
       {isNavigating && (
-        <View style={styles.navigatingContainer}>
+        <View style={[styles.navigatingContainer, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity style={styles.endNavBtn} onPress={handleEndNavigation} activeOpacity={0.8}>
             <Icon name="close-circle" size={20} color="#FFF" />
             <Text style={styles.endNavText}>End Navigation</Text>
@@ -1449,14 +1458,14 @@ export default function MapScreen({
 
       {/* Fetching Indicator */}
       {isMapFetching && (
-        <View style={{ position: 'absolute', top: 180, alignSelf: 'center', backgroundColor: 'rgba(30,30,50,0.85)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+        <View style={{ position: 'absolute', top: fetchingChipTop, alignSelf: 'center', backgroundColor: 'rgba(30,30,50,0.85)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
           <ActivityIndicator size="small" color={Pal.colors.light.primary} />
           <Text style={{ marginLeft: 8, color: '#FFF', fontSize: 13, fontWeight: '600' }}>Fetching places...</Text>
         </View>
       )}
 
       {/* Bottom-right zoom + GPS controls */}
-      <View style={[styles.mapControls, { bottom: selectedMarker ? detailBottomInset + 160 : 120 }]}>
+      <View style={[styles.mapControls, { bottom: controlsBottom }]}>
         <TouchableOpacity style={[styles.zoomBtn, { backgroundColor: cardBg, borderColor: borderClr }]} onPress={handleZoomIn}>
           <Icon name="add" size={22} color={headerText} />
         </TouchableOpacity>
@@ -1517,7 +1526,7 @@ export default function MapScreen({
 
       <Modal visible={filterModalOpen} transparent animationType="fade" onRequestClose={() => setFilterModalOpen(false)}>
         <Pressable style={styles.filterBackdrop} onPress={() => setFilterModalOpen(false)}>
-          <View style={[styles.filterSheet, { marginTop: insets.top + 160 }]}>
+          <View style={[styles.filterSheet, { marginTop: insets.top + (responsive.isSmallPhone ? 120 : 160) }]}>
             <Text style={styles.filterSheetTitle}>All place filters</Text>
             <ScrollView style={{ maxHeight: 320 }}>
               {CATEGORY_FILTERS.map(cat => {
@@ -1627,7 +1636,7 @@ const styles = StyleSheet.create({
   },
   detailCard: {
     position: 'absolute', left: 16, right: 16, zIndex: 20,
-    maxHeight: SCREEN_H * 0.52,
+    maxHeight: '52%',
     borderRadius: 16, borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
     overflow: 'hidden',
@@ -1728,7 +1737,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 25,
   },
   bottomSheet: {
-    position: 'absolute', left: 0, right: 0, height: SCREEN_H + 60,
+    position: 'absolute', left: 0, right: 0, height: '100%',
     bottom: 0, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: -12 },
     shadowOpacity: 0.2, shadowRadius: 32, elevation: 25, zIndex: 30, overflow: 'hidden',
@@ -1762,7 +1771,7 @@ const styles = StyleSheet.create({
     color: '#000', fontSize: 13, fontFamily: 'Inter-Bold',
   },
   sheetActionsFixed: {
-    paddingHorizontal: 20, paddingBottom: 34, paddingTop: 8,
+    paddingHorizontal: 20, paddingTop: 8,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
     backgroundColor: 'rgba(25,25,35,0.98)',
   },
@@ -1786,7 +1795,7 @@ const styles = StyleSheet.create({
   },
   sheetActionText: { color: '#FFF', fontSize: 14, fontFamily: 'Inter-SemiBold' },
   navigatingContainer: {
-    position: 'absolute', top: Platform.OS === 'ios' ? 60 : 40, left: 0, right: 0,
+    position: 'absolute', top: 0, left: 0, right: 0,
     alignItems: 'center', zIndex: 50,
   },
   endNavBtn: {

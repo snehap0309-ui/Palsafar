@@ -8,6 +8,7 @@ import RNFS from 'react-native-fs';
 import { monetizationApi } from '../services/api/monetization';
 import { apiClient } from '../services/api/client';
 import { API_CONFIG } from '../config/api';
+import { useBottomSafePadding } from '../design/responsive';
 
 type Tx = {
   id: string;
@@ -24,6 +25,7 @@ type Tx = {
 };
 
 export default function BillingHistoryScreen({ onBack }: { onBack?: () => void }) {
+  const scrollPadBottom = useBottomSafePadding(24);
   const [items, setItems] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +109,9 @@ export default function BillingHistoryScreen({ onBack }: { onBack?: () => void }
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={items.length === 0 ? styles.center : styles.list}
+          contentContainerStyle={
+            items.length === 0 ? styles.center : [styles.list, { paddingBottom: scrollPadBottom }]
+          }
           ListEmptyComponent={<Text style={styles.muted}>No payments yet.</Text>}
           renderItem={({ item }) => (
             <View style={styles.card}>
@@ -137,7 +141,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, textAlign: 'center', fontWeight: '800', fontSize: 17, color: '#63300E' },
-  list: { padding: 16, gap: 10, paddingBottom: 40 },
+  list: { padding: 16, gap: 10 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#E9D4BE', padding: 14, marginBottom: 10, gap: 6 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

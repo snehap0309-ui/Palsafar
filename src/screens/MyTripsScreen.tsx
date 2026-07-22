@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, RefreshControl, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Image, useWindowDimensions } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import Pal from '../design/DesignSystem';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -6,8 +6,9 @@ import { Badge } from '../components/ui/Badge';
 import { GradientButton } from '../components/ui/GradientButton';
 import { tripsApi, TripPlan } from '../services/api/trips';
 import { useToast } from '../context/ToastContext';
-
-const { width } = Dimensions.get('window');
+import { useHeaderSafePadding } from '../design/responsive';
+import { getMainTabBarClearance } from '../design/tabBarLayout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const tripEmojis: Record<string, string> = {
   beach: '🏖️', mountain: '⛰️', heritage: '🏛️', adventure: '🧗',
@@ -29,6 +30,9 @@ export default function MyTripsScreen({
   onNavigate?: (screen: string, params?: any) => void;
   initialTab?: 'UPCOMING' | 'DRAFT' | 'COMPLETED';
 }) {
+  const headerPadTop = useHeaderSafePadding(12);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [trips, setTrips] = useState<TripPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,7 +104,7 @@ export default function MyTripsScreen({
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Pal.colors.light.primary} />}
     >
-      <View style={{ padding: Pal.spacing[5], paddingTop: 56, gap: Pal.spacing[5] }}>
+      <View style={{ padding: Pal.spacing[5], paddingTop: headerPadTop, gap: Pal.spacing[5] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TouchableOpacity onPress={() => onNavigate?.('goBack')} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Pal.colors.light.surface, borderWidth: 1, borderColor: Pal.colors.light.border, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={{ color: Pal.colors.light.text, fontSize: 20 }}>←</Text>
@@ -265,7 +269,7 @@ export default function MyTripsScreen({
           );
         })}
 
-        <View style={{ paddingBottom: 128 }} />
+        <View style={{ paddingBottom: getMainTabBarClearance(insets.bottom) }} />
       </View>
     </ScrollView>
   );

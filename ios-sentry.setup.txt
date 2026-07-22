@@ -1,0 +1,10 @@
+# PalSafar iOS Sentry wiring
+#
+# 1. Podfile uses use_native_modules! so RNSentry autolinks after `pod install`.
+# 2. From repo root on macOS: `npm run ios:setup` (or `cd ios && bundle exec pod install`).
+# 3. Optional Xcode Build Phase — Run Script:
+#      "${PROJECT_DIR}/upload-dsym.sh"
+#    (uploads Release dSYMs when sentry.properties has auth.token)
+# 4. JS init in index.js covers iOS native crashes via sentry-cocoa once DSN is set.
+# 5. Set SENTRY_DSN via src/config/monitoring.local.ts or CI env before Archive.
+# 6. Bundle ID / release names should match sentry.properties project=palsafar-mobile.

@@ -14,6 +14,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocationContext } from '../context/LocationContext';
 import { ridesApi, RideEstimate } from '../services/api/rides';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PROVIDER_CONFIG: Record<string, { name: string; color: string; icon: string }> = {
   uber: { name: 'Uber', color: '#000000', icon: 'car-sport-outline' },
@@ -45,6 +46,7 @@ export default function RideOptionsSheet({
 }: RideOptionsSheetProps) {
   const { theme } = useTheme();
   const colors = theme;
+  const insets = useSafeAreaInsets();
   const { effectivePosition } = useLocationContext();
   const [estimates, setEstimates] = useState<RideEstimate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,7 +118,7 @@ export default function RideOptionsSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 16) + 14 }]}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>Ride Options</Text>
@@ -255,7 +257,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '85%',
-    paddingBottom: 30,
+    paddingBottom: 16,
   },
   handle: {
     width: 40,

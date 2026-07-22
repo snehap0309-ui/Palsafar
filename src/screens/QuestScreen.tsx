@@ -10,8 +10,8 @@ import {
   Alert,
   Image,
   Animated,
-  Dimensions,
   FlatList,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from '../utils/LinearGradient';
 import { Ionicons } from '../utils/Icons';
@@ -39,8 +39,8 @@ import {
   loadStartedQuests,
   saveStartedQuests,
 } from '../services/localStorageService';
+import { useHeaderSafePadding, useBottomSafePadding } from '../design/responsive';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const NEARBY_HUNT_RADIUS_KM = 60;
 
 // ─── Tab types ───────────────────────────────────────────────────────────────
@@ -69,6 +69,9 @@ export default function QuestScreen({ onBack, initialQuestId, initialTab = 'expl
   const { effectivePosition } = useLocationContext();
   const { user, setUser } = useUserContext();
   const { handleCompleteActivity } = useDataContext();
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const headerPadTop = useHeaderSafePadding();
+  const scrollPadBottom = useBottomSafePadding(40) + 80;
 
   // ─── State ────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
@@ -215,7 +218,7 @@ export default function QuestScreen({ onBack, initialQuestId, initialTab = 'expl
       tension: 80,
       friction: 10,
     }).start();
-  }, [activeTab]);
+  }, [activeTab, SCREEN_WIDTH]);
 
   // ─── Derived lists ────────────────────────────────────────────────────────
   const filteredHunts = allHunts.filter(h => {
@@ -563,7 +566,7 @@ export default function QuestScreen({ onBack, initialQuestId, initialTab = 'expl
           data={filteredHunts}
           keyExtractor={h => h.id}
           renderItem={renderHuntCard}
-          contentContainerStyle={styles.huntList}
+          contentContainerStyle={[styles.huntList, { paddingBottom: scrollPadBottom }]}
           scrollEnabled={false}
         />
       )}
@@ -586,7 +589,7 @@ export default function QuestScreen({ onBack, initialQuestId, initialTab = 'expl
           data={activeHunts}
           keyExtractor={h => h.id}
           renderItem={renderHuntCard}
-          contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: 120 }}
+          contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: scrollPadBottom }}
           scrollEnabled={false}
         />
       )}
@@ -639,7 +642,7 @@ export default function QuestScreen({ onBack, initialQuestId, initialTab = 'expl
           );
         })
       )}
-      <View style={{ height: 120 }} />
+      <View style={{ height: scrollPadBottom }} />
     </View>
   );
 
@@ -647,7 +650,7 @@ export default function QuestScreen({ onBack, initialQuestId, initialTab = 'expl
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={['#0A0A0A', '#121212'] as any} style={styles.header}>
+      <LinearGradient colors={['#0A0A0A', '#121212'] as any} style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity style={styles.backBtn} onPress={onBack}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
@@ -954,7 +957,7 @@ export default function QuestScreen({ onBack, initialQuestId, initialTab = 'expl
       {/* ── Celebration Modal ──────────────────────────────────────────────── */}
       {celebrationVisible && celebrationData && (
         <View style={styles.celebrationOverlay}>
-          <Animated.View style={[styles.celebrationCard, { opacity: celebrationOpacity, transform: [{ scale: celebrationScale }] }]}>
+          <Animated.View style={[styles.celebrationCard, { width: SCREEN_WIDTH - 48, opacity: celebrationOpacity, transform: [{ scale: celebrationScale }] }]}>
             <LinearGradient colors={[colors.gold, colors.orange, '#FF6B6B'] as any} style={styles.celebrationGrad}>
               <Text style={styles.celebrationEmoji}>🎉</Text>
               <Text style={styles.celebrationTitle}>Quest Complete!</Text>
@@ -988,7 +991,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xl + 4,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -1079,7 +1081,7 @@ const styles = StyleSheet.create({
   diffChipTextActive: { color: colors.gold },
 
   // Hunt list
-  huntList: { paddingHorizontal: spacing.md, paddingBottom: 120, paddingTop: spacing.sm },
+  huntList: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   huntCard: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
@@ -1308,7 +1310,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', zIndex: 999,
   },
   celebrationCard: {
-    width: SCREEN_WIDTH - 48,
     borderRadius: 24, overflow: 'hidden',
     ...shadows.lg,
   },

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useUserContext } from '../context/UserContext';
+import { useBottomSafePadding } from '../design/responsive';
 
 const HERO = require('../assets/settings_cover.png');
 
@@ -106,6 +107,7 @@ export default function SettingsScreen({
   const navigation = useNavigation<any>();
   const nav = navigationProp || navigation;
   const insets = useSafeAreaInsets();
+  const scrollPadBottom = useBottomSafePadding(32);
   const { onLogout: contextLogout } = useUserContext();
 
   const handleDeleteAccount = useCallback(() => {
@@ -218,7 +220,7 @@ export default function SettingsScreen({
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: scrollPadBottom }}
       >
         <View style={styles.heroWrap}>
           <Image source={HERO} style={styles.heroImage} resizeMode="cover" />

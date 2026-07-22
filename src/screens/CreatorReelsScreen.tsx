@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -12,6 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -20,6 +20,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { socialApi } from '../services/api/social';
 import { useUserContext } from '../context/UserContext';
 import type { Reel } from '../types';
+import { useStudioTabScreenInsets } from '../design/tabBarLayout';
 
 const C = {
   bg: '#FDFBF8',
@@ -34,9 +35,6 @@ const C = {
 const H_PAD = 20;
 const GAP = 10;
 const COLS = 3;
-const SCREEN_W = Dimensions.get('window').width;
-const TILE_W = (SCREEN_W - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
-const TILE_H = TILE_W * 1.35;
 
 type SortKey = 'latest' | 'oldest' | 'views' | 'likes';
 type StatusFilter = 'HIDDEN' | 'PENDING' | 'REJECTED' | 'APPROVED';
@@ -113,6 +111,10 @@ export default function CreatorReelsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useUserContext();
+  const studioInsets = useStudioTabScreenInsets();
+  const { width: SCREEN_W } = useWindowDimensions();
+  const TILE_W = (SCREEN_W - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
+  const TILE_H = TILE_W * 1.35;
   const creatorProfileId = user?.creatorProfile?.id;
   const userId = user?.uid;
 
@@ -246,12 +248,12 @@ export default function CreatorReelsScreen() {
 
   const renderTile = ({ item }: { item: CreatorReelRow }) => (
     <TouchableOpacity
-      style={styles.tile}
+      style={{ width: TILE_W }}
       activeOpacity={0.9}
       onPress={() => navigation.navigate('ReelDetail', { reelId: item.id, reels: filtered })}
       onLongPress={() => openEdit(item)}
     >
-      <View style={styles.thumbWrap}>
+      <View style={[styles.thumbWrap, { width: TILE_W, height: TILE_H }]}>
         {item.thumbnail ? (
           <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
         ) : (
@@ -317,7 +319,7 @@ export default function CreatorReelsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={C.bronze} />
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: studioInsets.scrollPadBottom }]}
         columnWrapperStyle={filtered.length > 0 ? styles.row : undefined}
         ListHeaderComponent={listHeader}
         ListFooterComponent={
@@ -387,7 +389,7 @@ export default function CreatorReelsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   center: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' },
-  list: { paddingHorizontal: H_PAD, paddingBottom: 120 },
+  list: { paddingHorizontal: H_PAD },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -399,10 +401,7 @@ const styles = StyleSheet.create({
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sortLabel: { fontSize: 12, fontWeight: '700', color: C.bronze },
   row: { gap: GAP, marginBottom: GAP },
-  tile: { width: TILE_W },
   thumbWrap: {
-    width: TILE_W,
-    height: TILE_H,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: C.deep,

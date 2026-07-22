@@ -1,12 +1,21 @@
 /**
- * Remove duplicate places from the database (SQL-assisted).
+ * Remove duplicate tourist places from the database.
  * Keeps highest-quality row per group; reassigns trip/collection refs before delete.
+ *
+ * Strategies:
+ *  1) Exact name + city + state (city non-empty)
+ *  2) Normalized name + city + state (city non-empty)
+ *  3) Normalized name + ~100m coord grid
+ *  4) Same normalized name + same state within 500m (catches empty-city OSM dups)
+ *  5) Generic OSM noise names with empty city
  *
  * Usage:
  *   node server/scripts/remove-place-duplicates.cjs --dry-run
  *   node server/scripts/remove-place-duplicates.cjs
  */
 const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
+const path = require('path');
 
 const prisma = new PrismaClient();
 const DRY = process.argv.includes('--dry-run');
@@ -20,6 +29,28 @@ const SOURCE_RANK = {
   OSM: 50,
 };
 
+const GENERIC_OSM_NAMES = new Set([
+  'temple',
+  'mandir',
+  'church',
+  'mosque',
+  'masjid',
+  'park',
+  'gurudwara',
+  "children's park",
+  'childrens park',
+  'chapel',
+  'hanuman mandir',
+  'durga mandir',
+  'shiv mandir',
+  'shiva mandir',
+  'kali mandir',
+  'ram mandir',
+  'datta mandir',
+  'jamia masjid',
+  'jama masjid',
+]);
+
 function score(p) {
   let s = SOURCE_RANK[p.source] || 0;
   s += (p.verificationLevel || 0) * 10;
@@ -29,6 +60,7 @@ function score(p) {
   if (p.hiddenGemScore && p.hiddenGemScore > 0) s += 5;
   if (p.popularityScore && p.popularityScore > 0) s += 5;
   if (p.rating && p.rating > 0) s += Math.min(p.rating * 4, 20);
+  if (p.city && String(p.city).trim()) s += 15;
   if (p.status === 'APPROVED') s += 20;
   if (p.status === 'REJECTED') s -= 50;
   return s;
@@ -49,6 +81,17 @@ function normName(name) {
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function haversineKm(aLat, aLng, bLat, bLng) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
 }
 
 async function reassignReferences(loserToWinner) {
@@ -159,17 +202,117 @@ async function processSqlGroups(sql, label, loserToWinnerGlobal) {
   return removed;
 }
 
+/**
+ * Same normalized name + same state, within radiusKm.
+ * Generic names use a tighter radius to avoid merging different temples.
+ */
+async function processProximityDuplicates(loserToWinnerGlobal, radiusKm = 0.5) {
+  const rows = await prisma.place.findMany({
+    where: {
+      status: { in: ['APPROVED', 'PENDING'] },
+      category: { notIn: ['SHOPPING', 'RESTAURANT', 'HOTEL'] },
+      latitude: { not: null },
+      longitude: { not: null },
+    },
+    select: {
+      id: true,
+      name: true,
+      city: true,
+      state: true,
+      source: true,
+      status: true,
+      description: true,
+      images: true,
+      thumbnail: true,
+      verificationLevel: true,
+      hiddenGemScore: true,
+      popularityScore: true,
+      rating: true,
+      latitude: true,
+      longitude: true,
+      createdAt: true,
+    },
+  });
+
+  const byKey = new Map();
+  for (const r of rows) {
+    const key = `${normName(r.name)}|${String(r.state || '').toLowerCase().trim()}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(r);
+  }
+
+  const localMap = new Map();
+  let groups = 0;
+
+  for (const [, group] of byKey) {
+    if (group.length < 2) continue;
+    const nameKey = normName(group[0].name);
+    const maxKm = GENERIC_OSM_NAMES.has(nameKey) ? 0.35 : radiusKm;
+
+    const used = new Set();
+    for (let i = 0; i < group.length; i++) {
+      if (used.has(group[i].id) || loserToWinnerGlobal.has(group[i].id)) continue;
+      const cluster = [group[i]];
+      used.add(group[i].id);
+      for (let j = i + 1; j < group.length; j++) {
+        if (used.has(group[j].id) || loserToWinnerGlobal.has(group[j].id)) continue;
+        const d = haversineKm(
+          group[i].latitude,
+          group[i].longitude,
+          group[j].latitude,
+          group[j].longitude,
+        );
+        if (d <= maxKm) {
+          cluster.push(group[j]);
+          used.add(group[j].id);
+        }
+      }
+      if (cluster.length < 2) continue;
+      groups++;
+      const winner = pickWinner(cluster);
+      for (const m of cluster) {
+        if (m.id === winner.id) continue;
+        if (loserToWinnerGlobal.has(m.id)) continue;
+        localMap.set(m.id, winner.id);
+        loserToWinnerGlobal.set(m.id, winner.id);
+      }
+    }
+  }
+
+  const loserIds = [...localMap.keys()];
+  await reassignReferences(localMap);
+  const removed = await deleteLosers(loserIds, 'proximity-name-state');
+  console.log(`proximity-name-state: groups=${groups}, removed=${removed}`);
+  return removed;
+}
+
+async function processGenericEmptyCity(loserToWinnerGlobal) {
+  const generic = await prisma.place.findMany({
+    where: {
+      source: 'OSM',
+      OR: [{ city: '' }, { city: { equals: 'India', mode: 'insensitive' } }],
+      name: { in: [...GENERIC_OSM_NAMES], mode: 'insensitive' },
+    },
+    select: { id: true },
+  });
+  const ids = generic.map((g) => g.id).filter((id) => !loserToWinnerGlobal.has(id));
+  // These are noise — delete without remapping to a winner
+  const removed = await deleteLosers(ids, 'generic-empty-city-osm');
+  console.log(`generic-empty-city-osm: removed=${removed}`);
+  return removed;
+}
+
 function dedupeCuratedJson(filePath, dryRun) {
-  const fs = require('fs');
   const curatedJson = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const groups = [];
   for (const p of curatedJson) {
     if (p.latitude == null || p.longitude == null) continue;
     const key = normName(p.name);
     const match = groups.find(
-      (g) => g.key === key
-        && Math.abs(g.lat - p.latitude) < 0.003
-        && Math.abs(g.lng - p.longitude) < 0.003,
+      (g) =>
+        g.key === key &&
+        Math.abs(g.lat - p.latitude) < 0.003 &&
+        Math.abs(g.lng - p.longitude) < 0.003,
     );
     if (match) {
       match.items.push(p);
@@ -217,7 +360,9 @@ async function main() {
     SELECT array_agg(id) AS ids, COUNT(*)::int AS cnt
     FROM places
     WHERE trim(city) <> ''
-    GROUP BY regexp_replace(lower(trim(name)), '[^a-z0-9]+', ' ', 'g'), lower(trim(city)), lower(trim(state))
+    GROUP BY regexp_replace(lower(trim(name)), '[^a-z0-9]+', ' ', 'g'),
+             lower(trim(city)),
+             lower(trim(state))
     HAVING COUNT(*) > 1
     `,
     'normalized-name-city-state',
@@ -238,26 +383,18 @@ async function main() {
     loserToWinner,
   );
 
-  removed += await processSqlGroups(
-    `
-    SELECT array_agg(id) AS ids, COUNT(*)::int AS cnt
-    FROM places
-    WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-    GROUP BY lower(trim(name)),
-             round(latitude::numeric, 3),
-             round(longitude::numeric, 3)
-    HAVING COUNT(*) > 1
-    `,
-    'exact-name-coord-grid',
-    loserToWinner,
-  );
+  removed += await processProximityDuplicates(loserToWinner, 0.5);
+  removed += await processGenericEmptyCity(loserToWinner);
 
   const after = await prisma.place.count();
   console.log(
-    JSON.stringify({ before, after, removed: before - after, dryRun: DRY, reportedRemoved: removed }, null, 2),
+    JSON.stringify(
+      { before, after, removed: before - after, dryRun: DRY, reportedRemoved: removed },
+      null,
+      2,
+    ),
   );
 
-  const path = require('path');
   const file = path.join(__dirname, '../prisma/seed-data/places-curated.json');
   const { jsonRemoved, count } = dedupeCuratedJson(file, DRY);
   console.log(`curated.json dups removed: ${jsonRemoved} (now ${count})`);

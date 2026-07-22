@@ -4,6 +4,7 @@ import {
   ActivityIndicator, FlatList, Image, RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useBottomSafePadding } from '../design/responsive';
 import { vendorsApi } from '../services/api/vendors';
 
 interface VendorReelItem {
@@ -28,6 +29,8 @@ export default function VendorReelsScreen({
   vendorName,
   onBack,
 }: VendorReelsScreenProps) {
+  // Stack screen (RootNavigator) — not a VendorTabs child; use safe bottom only
+  const listPadBottom = useBottomSafePadding(24);
   const [reels, setReels] = useState<VendorReelItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,7 +81,11 @@ export default function VendorReelsScreen({
         <FlatList
           data={reels}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={reels.length === 0 ? styles.centered : styles.list}
+          contentContainerStyle={
+            reels.length === 0
+              ? styles.centered
+              : [styles.list, { paddingBottom: listPadBottom }]
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -146,7 +153,7 @@ const styles = StyleSheet.create({
     color: '#2C1810',
   },
   centered: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  list: { padding: 16, paddingBottom: 40 },
+  list: { padding: 16 },
   errorText: { color: '#FF5A5F', marginBottom: 12, textAlign: 'center' },
   retryBtn: {
     backgroundColor: '#B9834B',

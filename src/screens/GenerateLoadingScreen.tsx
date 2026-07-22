@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, ImageBackground, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, ImageBackground, StatusBar, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Pal from '../design/DesignSystem';
@@ -8,8 +8,6 @@ import { useUserContext } from '../context/UserContext';
 import { apiClient } from '../services/api';
 import { tripsApi, AiGenerateInput } from '../services/api/trips';
 import { API_CONFIG } from '../config/api';
-
-const { width: W, height: H } = Dimensions.get('window');
 
 const PHASES = [
   'Waking up trip servers...',
@@ -108,6 +106,7 @@ export default function GenerateLoadingScreen({ route: propRoute }: { navigation
   const navigation = useNavigation<any>();
   const hookRoute = useRoute<any>();
   const { isGuest } = useUserContext();
+  const { width: W, height: H } = useWindowDimensions();
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
@@ -250,7 +249,7 @@ export default function GenerateLoadingScreen({ route: propRoute }: { navigation
   };
 
   return (
-    <ImageBackground source={require('../assets/map_preview_bg.jpg')} style={styles.container}>
+    <ImageBackground source={require('../assets/map_preview_bg.jpg')} style={[styles.container, { width: W, height: H }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient colors={['rgba(10,37,64,0.85)', 'rgba(10,37,64,0.98)']} style={StyleSheet.absoluteFillObject} />
 
@@ -315,7 +314,7 @@ export default function GenerateLoadingScreen({ route: propRoute }: { navigation
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, width: W, height: H, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   content: { alignItems: 'center', width: '100%', paddingHorizontal: 40 },
 
   robotCircle: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(47,128,237,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(47,128,237,0.5)', marginBottom: 40 },

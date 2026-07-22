@@ -270,6 +270,7 @@ class ApiClient {
       ? 120_000
       : API_CONFIG.timeout;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const startedAt = Date.now();
 
     try {
       const response = await fetch(url, {
@@ -328,9 +329,29 @@ class ApiClient {
         throw err;
       }
 
+      const durationMs = Date.now() - startedAt;
+      try {
+        const { reportApiCall } = require('../monitoring');
+        reportApiCall({ method, path, status: response.status, durationMs });
+      } catch { /* monitoring optional at bootstrap */ }
+
       return json as StandardApiResponse<T>;
     } catch (error: any) {
       clearTimeout(timeout);
+      const durationMs = Date.now() - startedAt;
+      const status = error?.status;
+      try {
+        const { reportApiCall } = require('../monitoring');
+        reportApiCall({
+          method,
+          path,
+          status,
+          durationMs,
+          error,
+          responseBody: error?.data,
+        });
+      } catch { /* monitoring optional */ }
+
       if (error.name === 'AbortError') {
         throw new (Error as any)('Request timed out. Please check your connection.', { cause: error });
       }

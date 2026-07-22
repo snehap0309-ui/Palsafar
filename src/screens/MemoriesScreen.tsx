@@ -15,12 +15,14 @@ import { LinearGradient } from '../utils/LinearGradient';
 import { Ionicons } from '../utils/Icons';
 import { colors, spacing, borderRadius, shadows } from '../config/theme';
 import { Memory, memories as initialMemories, addMemory } from '../data/memoriesData';
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface MemoriesScreenProps {
   onBack: () => void;
 }
 
 export default function MemoriesScreen({ onBack }: MemoriesScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCaption, setNewCaption] = useState('');
   const [spotName, setSpotName] = useState('Bhedaghat Marble Rocks');
@@ -140,7 +142,7 @@ export default function MemoriesScreen({ onBack }: MemoriesScreenProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -292,7 +294,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl + 8,
+    paddingTop: 0,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

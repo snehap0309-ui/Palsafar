@@ -91,8 +91,10 @@ export default function TripBuilderScreen() {
         setTrip(draft);
         seedDraftTripCache(draft);
         setCurrentDay(prev => {
-          const currentStops = draft.tripDays?.[prev]?.stops?.length || 0;
-          if (mode === 'initial' || currentStops === 0) return pickPrimaryDayIndex(draft);
+          const tripForDay = draft;
+          if (!tripForDay) return prev;
+          const currentStops = tripForDay.tripDays?.[prev]?.stops?.length || 0;
+          if (mode === 'initial' || currentStops === 0) return pickPrimaryDayIndex(tripForDay);
           return prev;
         });
       } else if (!hasExistingStops) {

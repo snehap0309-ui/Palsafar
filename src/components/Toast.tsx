@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useHeaderSafePadding } from '../design/responsive';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -24,6 +25,7 @@ const TOAST_COLORS: Record<ToastType, { bg: string; text: string; icon: string }
 };
 
 function ToastItem({ toast, onHide }: ToastItemProps) {
+  const topPad = useHeaderSafePadding(12);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-20)).current;
 
@@ -46,7 +48,7 @@ function ToastItem({ toast, onHide }: ToastItemProps) {
   const colors = TOAST_COLORS[toast.type];
 
   return (
-    <Animated.View style={[styles.container, { backgroundColor: colors.bg, opacity, transform: [{ translateY }] }]}>
+    <Animated.View style={[styles.container, { top: topPad, backgroundColor: colors.bg, opacity, transform: [{ translateY }] }]}>
       <Text style={styles.icon}>{colors.icon}</Text>
       <Text style={[styles.message, { color: colors.text }]} numberOfLines={2}>{toast.message}</Text>
       {toast.action && (
@@ -61,7 +63,6 @@ function ToastItem({ toast, onHide }: ToastItemProps) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 60,
     left: 16,
     right: 16,
     flexDirection: 'row',

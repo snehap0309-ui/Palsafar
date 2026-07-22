@@ -13,11 +13,34 @@ import {
   type Messaging,
   type RemoteMessage,
 } from '@react-native-firebase/messaging';
+import { APP_BUILD, APP_VERSION } from '../config/monitoringConfig';
 import { notificationsApi } from './api';
+import { showInAppNotificationBanner } from '../components/notifications/NotificationBannerHost';
+import {
+  flushPendingNotificationRoute,
+  navigateFromRemoteMessage,
+} from './notifications/notificationNavigation';
+import { trackNotificationEvent } from './notifications/notificationAnalytics';
+import {
+  clearBadge,
+  setUnreadBadgeCount,
+} from './notifications/notificationBadgeStore';
+import {
+  enqueueMarkAllRead,
+  enqueueMarkRead,
+  flushOfflineQueue,
+  startOfflineQueueListener,
+} from './notifications/notificationOfflineQueue';
+import { normalizeNotificationData } from './notifications/notificationPayload';
+import { navigateFromInAppNotification } from './notifications/notificationNavigation';
 
 let messagingInstance: Messaging | null | undefined;
 let lastRegisteredToken: string | null = null;
 let refreshUnsubscribe: (() => void) | null = null;
+let handlersInitialized = false;
+let foregroundUnsub: (() => void) | null = null;
+let openedUnsub: (() => void) | null = null;
+let offlineUnsub: (() => void) | null = null;
 
 function messagingOrNull(): Messaging | null {
   if (messagingInstance !== undefined) return messagingInstance;
@@ -57,23 +80,71 @@ async function syncTokenToServer(token: string, retries = 3): Promise<void> {
       await notificationsApi.registerToken({
         token,
         platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
+        appVersion: APP_VERSION,
+        buildNumber: APP_BUILD,
       });
       lastRegisteredToken = token;
+      trackNotificationEvent('sent', { kind: 'token_register', platform: Platform.OS });
       return;
     } catch (err) {
       lastError = err;
       attempt += 1;
+      trackNotificationEvent('retry', { kind: 'token_register', attempt });
       await new Promise((r) => setTimeout(r, 500 * attempt));
     }
   }
   console.warn('[notificationService] Token sync failed after retries:', lastError);
+  trackNotificationEvent('failure', { kind: 'token_register' });
+}
+
+function handleForegroundMessage(remoteMessage: RemoteMessage) {
+  const payload = normalizeNotificationData(
+    remoteMessage.data as Record<string, unknown>,
+    remoteMessage.notification,
+  );
+  const title = String(remoteMessage.notification?.title || payload.title || 'PalSafar');
+  const body = String(remoteMessage.notification?.body || payload.body || '');
+
+  showInAppNotificationBanner({
+    title,
+    body,
+    actions: [
+      {
+        label: 'Open',
+        onPress: () => navigateFromRemoteMessage(remoteMessage, 'push_foreground'),
+      },
+    ],
+    onPress: () => navigateFromRemoteMessage(remoteMessage, 'push_foreground'),
+  });
+
+  void refreshUnreadBadgeCount();
+}
+
+function handleNotificationOpen(remoteMessage: RemoteMessage, source: 'push_background' | 'push_quit') {
+  navigateFromRemoteMessage(remoteMessage, source);
+  void refreshUnreadBadgeCount();
+}
+
+export async function refreshUnreadBadgeCount(): Promise<number> {
+  try {
+    const res = await notificationsApi.list(1, 1);
+    const count = res?.unreadCount ?? 0;
+    setUnreadBadgeCount(count);
+    return count;
+  } catch {
+    return 0;
+  }
 }
 
 export const notificationService = {
   async getNotifications(page = 1, limit = 20) {
     try {
       const res = await notificationsApi.list(page, limit);
-      return res.notifications || (res as any).data?.notifications || [];
+      const list = res.notifications || (res as any).data?.notifications || [];
+      if (typeof res.unreadCount === 'number') {
+        setUnreadBadgeCount(res.unreadCount);
+      }
+      return list;
     } catch (err) {
       console.warn('[notificationService] getNotifications failed:', err);
       return [];
@@ -83,16 +154,20 @@ export const notificationService = {
   async markAsRead(notificationId: string): Promise<void> {
     try {
       await notificationsApi.markRead([notificationId]);
-    } catch (err) {
-      console.warn('[notificationService] markAsRead failed:', err);
+    } catch {
+      await enqueueMarkRead([notificationId]);
+    } finally {
+      void refreshUnreadBadgeCount();
     }
   },
 
   async markAllAsRead(): Promise<void> {
     try {
       await notificationsApi.markAllRead();
-    } catch (err) {
-      console.warn('[notificationService] markAllAsRead failed:', err);
+    } catch {
+      await enqueueMarkAllRead();
+    } finally {
+      void refreshUnreadBadgeCount();
     }
   },
 
@@ -128,7 +203,6 @@ export const notificationService = {
     );
   },
 
-  /** Re-request permission or open Settings if permanently denied (Android 13+). */
   async retryPermissionFlow(): Promise<boolean> {
     const granted = await this.isPermissionGranted();
     if (granted) return true;
@@ -147,7 +221,6 @@ export const notificationService = {
       return token || null;
     } catch (err: any) {
       const msg = String(err?.message || err || '');
-      // Placeholder google-services.json has no real API key — skip noisy stack traces in local/dev builds.
       if (/valid API key|api.?key/i.test(msg)) {
         if (__DEV__) {
           console.warn('[notificationService] FCM skipped: Firebase API key not configured');
@@ -159,7 +232,11 @@ export const notificationService = {
     }
   },
 
-  async registerDeviceToken(): Promise<void> {
+  /**
+   * Register / refresh device token — call after login, signup, and session restore.
+   * Re-syncs when token, platform, or app version changes.
+   */
+  async registerDeviceToken(options?: { force?: boolean }): Promise<void> {
     const messaging = messagingOrNull();
     if (!messaging) return;
 
@@ -172,6 +249,12 @@ export const notificationService = {
     const token = await this.getFCMToken();
     if (!token) return;
 
+    if (!options?.force && token === lastRegisteredToken) {
+      // Still ping server so updatedAt / ownership stays fresh after restoreSession.
+      await syncTokenToServer(token);
+      return;
+    }
+
     await syncTokenToServer(token);
 
     if (!refreshUnsubscribe && typeof onTokenRefresh === 'function') {
@@ -180,6 +263,13 @@ export const notificationService = {
         await syncTokenToServer(newToken);
       });
     }
+  },
+
+  /** Alias for cold-start session restore path. */
+  async syncDeviceAfterSessionRestore(): Promise<void> {
+    await this.registerDeviceToken({ force: true });
+    await refreshUnreadBadgeCount();
+    void flushOfflineQueue();
   },
 
   async unregisterDeviceToken(): Promise<void> {
@@ -191,6 +281,7 @@ export const notificationService = {
       console.warn('[notificationService] unregisterDeviceToken failed:', err);
     } finally {
       lastRegisteredToken = null;
+      clearBadge();
       if (refreshUnsubscribe) {
         refreshUnsubscribe();
         refreshUnsubscribe = null;
@@ -217,39 +308,81 @@ export const notificationService = {
     );
   },
 
-  /** Prompt user to open Settings after permanent denial. */
   async openSystemSettings(): Promise<void> {
     await Linking.openSettings();
   },
 
-  async setupForegroundHandler(): Promise<(() => void) | null> {
-    const messaging = messagingOrNull();
-    if (!messaging || typeof onMessage !== 'function') return null;
-
-    return onMessage(messaging, async (remoteMessage: RemoteMessage) => {
-      const title = remoteMessage.notification?.title || remoteMessage.data?.title;
-      const body = remoteMessage.notification?.body || remoteMessage.data?.body;
-      if (title || body) {
-        Alert.alert(String(title || 'PalSafar'), String(body || ''));
-      }
-    });
-  },
-
-  async onNotificationOpenedApp(
-    handler: (remoteMessage: RemoteMessage) => void,
-  ): Promise<(() => void) | null> {
-    const messaging = messagingOrNull();
-    if (!messaging || typeof subscribeNotificationOpenedApp !== 'function') return null;
-    return subscribeNotificationOpenedApp(messaging, handler);
-  },
-
-  async checkInitialNotification(): Promise<RemoteMessage | null> {
-    const messaging = messagingOrNull();
-    if (!messaging || typeof getInitialNotification !== 'function') return null;
-    try {
-      return await getInitialNotification(messaging);
-    } catch {
-      return null;
+  /** Single bootstrap — call once from AppInitializer. */
+  async initHandlers(): Promise<() => void> {
+    if (handlersInitialized) {
+      return () => {};
     }
+    handlersInitialized = true;
+
+    offlineUnsub = startOfflineQueueListener();
+    void flushOfflineQueue();
+
+    const messaging = messagingOrNull();
+    if (!messaging) {
+      return () => {
+        offlineUnsub?.();
+        offlineUnsub = null;
+        handlersInitialized = false;
+      };
+    }
+
+    if (typeof onMessage === 'function') {
+      foregroundUnsub = onMessage(messaging, handleForegroundMessage);
+    }
+
+    if (typeof subscribeNotificationOpenedApp === 'function') {
+      openedUnsub = subscribeNotificationOpenedApp(messaging, (msg) =>
+        handleNotificationOpen(msg, 'push_background'),
+      );
+    }
+
+    try {
+      const initial = await getInitialNotification(messaging);
+      if (initial) {
+        handleNotificationOpen(initial, 'push_quit');
+      }
+    } catch {
+      /* no initial notification */
+    }
+
+    flushPendingNotificationRoute();
+
+    return () => {
+      foregroundUnsub?.();
+      openedUnsub?.();
+      offlineUnsub?.();
+      foregroundUnsub = null;
+      openedUnsub = null;
+      offlineUnsub = null;
+      handlersInitialized = false;
+    };
+  },
+
+  navigateFromInAppNotification,
+
+  refreshUnreadBadgeCount,
+
+  /** Dev QA — simulate foreground banner without Firebase Console. */
+  showLocalTestBanner(title: string, body: string, data?: Record<string, string>) {
+    const fakeMessage = {
+      data: data || { type: 'system', screen: 'Notifications' },
+      notification: { title, body },
+    } as RemoteMessage;
+    showInAppNotificationBanner({
+      title,
+      body,
+      actions: [
+        {
+          label: 'Open',
+          onPress: () => navigateFromRemoteMessage(fakeMessage, 'push_foreground'),
+        },
+      ],
+      onPress: () => navigateFromRemoteMessage(fakeMessage, 'push_foreground'),
+    });
   },
 };

@@ -4,6 +4,8 @@ import { API_CONFIG } from '../../config/api';
 export interface RegisterDeviceTokenInput {
   token: string;
   platform?: 'ios' | 'android' | 'web' | 'unknown';
+  appVersion?: string;
+  buildNumber?: string;
 }
 
 export interface InAppNotification {

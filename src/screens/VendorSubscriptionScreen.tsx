@@ -8,11 +8,13 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { monetizationApi } from '../services/api/monetization';
 import { useEntitlements } from '../context/EntitlementContext';
 import { useUserContext } from '../context/UserContext';
+import { useBottomSafePadding } from '../design/responsive';
 
 export default function VendorSubscriptionScreen({ onBack }: { onBack?: () => void }) {
   const navigation = useNavigation<any>();
   const { user } = useUserContext();
   const { entitlements, refreshEntitlements, loading: entLoading } = useEntitlements();
+  const scrollPadBottom = useBottomSafePadding(24);
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,9 +69,12 @@ export default function VendorSubscriptionScreen({ onBack }: { onBack?: () => vo
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.iconBtn}>
-          <Icon name="chevron-back" size={22} color="#63300E" />
+          <Icon name="arrow-back" size={22} color="#63300E" />
         </TouchableOpacity>
-        <Text style={styles.title}>Vendor subscription</Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>VENDOR WORKSPACE</Text>
+          <Text style={styles.title}>Subscription</Text>
+        </View>
         <TouchableOpacity onPress={() => navigation.navigate('BillingHistory')} style={styles.iconBtn}>
           <Icon name="receipt-outline" size={20} color="#63300E" />
         </TouchableOpacity>
@@ -83,7 +88,7 @@ export default function VendorSubscriptionScreen({ onBack }: { onBack?: () => vo
           <TouchableOpacity style={styles.btn} onPress={load}><Text style={styles.btnText}>Try again</Text></TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollPadBottom }]}>
           <View style={styles.card}>
             <Text style={styles.label}>Current plan</Text>
             <Text style={styles.value}>{sub?.name || 'No active plan'}</Text>
@@ -101,37 +106,41 @@ export default function VendorSubscriptionScreen({ onBack }: { onBack?: () => vo
             ) : null}
           </View>
 
-          <TouchableOpacity
-            style={[styles.btn, styles.outline]}
-            onPress={async () => {
-              try {
-                await monetizationApi.uploadVendorDocument('GST', 'https://palsafar.com/placeholder-doc', 'gst-placeholder.pdf');
-                Alert.alert('Document recorded', 'Upload registered. Replace with a real file URL from Cloudinary in production.');
-              } catch (e: any) {
-                Alert.alert('Documents', e?.message || 'Could not register document');
-              }
-            }}
-          >
-            <Text style={[styles.btnText, styles.outlineText]}>Register GST document</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, styles.outline]}
-            onPress={async () => {
-              try {
-                const code = `V${Date.now().toString(36).toUpperCase().slice(-6)}`;
-                await monetizationApi.createVendorCoupon({
-                  code,
-                  type: 'PERCENTAGE',
-                  value: 10,
-                });
-                Alert.alert('Coupon', `Created ${code}`);
-              } catch (e: any) {
-                Alert.alert('Coupon', e?.message || 'Could not create coupon');
-              }
-            }}
-          >
-            <Text style={[styles.btnText, styles.outlineText]}>Create vendor coupon</Text>
-          </TouchableOpacity>
+          {__DEV__ ? (
+            <>
+              <TouchableOpacity
+                style={[styles.btn, styles.outline]}
+                onPress={async () => {
+                  try {
+                    await monetizationApi.uploadVendorDocument('GST', 'https://palsafar.com/placeholder-doc', 'gst-placeholder.pdf');
+                    Alert.alert('Document recorded', 'Dev placeholder upload only.');
+                  } catch (e: any) {
+                    Alert.alert('Documents', e?.message || 'Could not register document');
+                  }
+                }}
+              >
+                <Text style={[styles.btnText, styles.outlineText]}>Register GST document (dev)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.outline]}
+                onPress={async () => {
+                  try {
+                    const code = `V${Date.now().toString(36).toUpperCase().slice(-6)}`;
+                    await monetizationApi.createVendorCoupon({
+                      code,
+                      type: 'PERCENTAGE',
+                      value: 10,
+                    });
+                    Alert.alert('Coupon', `Created ${code}`);
+                  } catch (e: any) {
+                    Alert.alert('Coupon', e?.message || 'Could not create coupon');
+                  }
+                }}
+              >
+                <Text style={[styles.btnText, styles.outlineText]}>Create vendor coupon (dev)</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
 
           <Text style={styles.section}>Upgrade / renew</Text>
           {plans.length === 0 ? (
@@ -173,19 +182,24 @@ function Usage({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#FFF9F2' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, textAlign: 'center', fontWeight: '800', fontSize: 17, color: '#63300E' },
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
+  headerCopy: { flex: 1, minWidth: 0 },
+  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: '#A67C52' },
+  iconBtn: {
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#E9D4BE', marginTop: 2,
+  },
+  title: { fontWeight: '800', fontSize: 20, color: '#4D3227', marginTop: 4, letterSpacing: -0.3 },
+  content: { padding: 16, gap: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#E9D4BE', padding: 16, gap: 8 },
-  label: { fontSize: 11, fontWeight: '800', color: '#8B7355', textTransform: 'uppercase' },
-  value: { fontSize: 18, fontWeight: '800', color: '#63300E' },
+  label: { fontSize: 11, fontWeight: '800', color: '#8B7355', textTransform: 'uppercase', letterSpacing: 0.8 },
+  value: { fontSize: 18, fontWeight: '800', color: '#4D3227' },
   muted: { fontSize: 13, color: '#8B7355', lineHeight: 18 },
-  section: { fontSize: 16, fontWeight: '800', color: '#63300E', marginTop: 8 },
-  btn: { backgroundColor: '#B9834B', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
-  btnText: { color: '#fff', fontWeight: '800' },
-  outline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#B9834B' },
+  section: { fontSize: 16, fontWeight: '800', color: '#4D3227', marginTop: 8 },
+  btn: { backgroundColor: '#63300E', borderRadius: 20, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+  btnText: { color: '#FFF9F2', fontWeight: '800' },
+  outline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#E9D4BE' },
   outlineText: { color: '#63300E' },
   usageRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   usage: { flex: 1, backgroundColor: '#FBEFE2', borderRadius: 10, padding: 10 },

@@ -5,9 +5,12 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { useTheme } from '../context/ThemeContext';
 import { authApi, type AccountDeletionInfo } from '../services/api/auth';
 import { useUserContext } from '../context/UserContext';
+import { useHeaderSafePadding, useBottomSafePadding } from '../design/responsive';
 
 export default function DeleteAccountScreen({ navigation }: { navigation?: any }) {
   const { theme } = useTheme();
+  const headerPadTop = useHeaderSafePadding(12);
+  const scrollPadBottom = useBottomSafePadding(24);
   const { onLogout } = useUserContext();
   const [info, setInfo] = useState<AccountDeletionInfo | null>(null);
   const [password, setPassword] = useState('');
@@ -73,7 +76,7 @@ export default function DeleteAccountScreen({ navigation }: { navigation?: any }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ padding: Pal.spacing[5], paddingTop: 56, gap: Pal.spacing[5] }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: Pal.spacing[5], paddingTop: headerPadTop, paddingBottom: scrollPadBottom, gap: Pal.spacing[5] }} keyboardShouldPersistTaps="handled">
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <TouchableOpacity onPress={() => navigation?.goBack()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.glass, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={{ color: theme.text, fontSize: 20 }}>←</Text>

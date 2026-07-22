@@ -5,8 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
-  Platform,
   Image,
   Alert,
 } from 'react-native';
@@ -23,8 +21,9 @@ import { useEntitlements } from '../context/EntitlementContext';
 import { DEV_FLAGS } from '../config/devFlags';
 import { tripsApi } from '../services/api/trips';
 import type { UserActiveMode, UserProfile } from '../types';
+import { getMainTabBarClearance } from '../design/tabBarLayout';
+import { useHeaderSafePadding } from '../design/responsive';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PAD = 16;
 
 const C = {
@@ -78,10 +77,6 @@ interface ProfileSectionProps {
 function formatPoints(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`;
   return n.toLocaleString('en-IN');
-}
-
-function computeLevel(points: number): number {
-  return Math.max(1, Math.min(99, Math.floor(points / 100) + 1));
 }
 
 function StatCard({
@@ -163,12 +158,12 @@ export default function ProfileSection({
 }: ProfileSectionProps) {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const headerPadTop = useHeaderSafePadding(8);
   const { isPremium } = useEntitlements();
   const [itineraryCount, setItineraryCount] = useState(0);
 
   const points = palPoints ?? user.totalPoints ?? 0;
   const placesVisited = user.visitedSpots?.length || 0;
-  const level = computeLevel(points);
   const userAvatar = AVATARS[user.avatarStyle] || '🧭';
   const handle = user.creatorProfile?.username
     ? `@${user.creatorProfile.username}`
@@ -205,7 +200,7 @@ export default function ProfileSection({
     <ScrollView
       style={styles.scroll}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: getMainTabBarClearance(insets.bottom) }}
     >
       {/* Header hero */}
       <View style={styles.hero}>
@@ -225,7 +220,7 @@ export default function ProfileSection({
           color="rgba(185,131,75,0.1)"
           style={styles.heroDecorRight}
         />
-        <View style={[styles.heroTop, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.heroTop, { paddingTop: headerPadTop }]}>
           <View style={{ width: 40 }} />
           <View style={styles.heroActions}>
             <TouchableOpacity
@@ -265,19 +260,13 @@ export default function ProfileSection({
               </TouchableOpacity>
             </View>
             <Text style={styles.handle}>{handle}</Text>
-            <View style={styles.badgeRow}>
-              <View style={styles.explorerBadge}>
-                <MaterialCommunityIcons name="hexagon-slice-6" size={14} color={C.blue} />
-                <Text style={styles.explorerText}>
-                  Travel Explorer • Level {level}
-                </Text>
-              </View>
-              {isPremium ? (
-                <View style={[styles.levelBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={[styles.levelText, { color: '#B45309' }]}>PRO</Text>
+            {isPremium ? (
+              <View style={styles.badgeRow}>
+                <View style={[styles.proBadge, { backgroundColor: '#FEF3C7' }]}>
+                  <Text style={[styles.proBadgeText, { color: '#B45309' }]}>PRO</Text>
                 </View>
-              ) : null}
-            </View>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -527,25 +516,12 @@ const styles = StyleSheet.create({
   },
   handle: { fontSize: 13, fontWeight: '500', color: C.textSub, marginTop: 2 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  explorerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  explorerText: { fontSize: 11, fontWeight: '700', color: C.ink },
-  levelBadge: {
+  proBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
-    backgroundColor: '#FFEDD5',
   },
-  levelText: { fontSize: 10, fontWeight: '800', color: C.orange },
+  proBadgeText: { fontSize: 10, fontWeight: '800' },
 
   statsRow: {
     flexDirection: 'row',

@@ -10,18 +10,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '../utils/Icons';
 import { colors, spacing, borderRadius, shadows } from '../config/theme';
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface CreditsScreenProps {
   onBack: () => void;
 }
 
 export default function CreditsScreen({ onBack }: CreditsScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -142,7 +144,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: 0,
     paddingBottom: spacing.md,
   },
   backButton: {

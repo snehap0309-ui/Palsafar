@@ -71,10 +71,11 @@ export default function VendorCustomersScreen({ onBack }: { onBack?: () => void 
       <View style={styles.header}>
         {onBack ? (
           <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-            <Icon name="chevron-back" size={22} color={VendorUI.colors.text} />
+            <Icon name="arrow-back" size={22} color={VendorUI.colors.primaryDark} />
           </TouchableOpacity>
-        ) : <View style={{ width: 40 }} />}
-        <View style={{ flex: 1 }}>
+        ) : <View style={{ width: 42 }} />}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.eyebrow}>VENDOR WORKSPACE</Text>
           <Text style={styles.title}>Customers</Text>
           <Text style={styles.sub}>From offer redemptions</Text>
         </View>
@@ -155,27 +156,34 @@ function SummaryChip({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: VendorUI.colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 20, fontWeight: '800', color: VendorUI.colors.text },
-  sub: { fontSize: 12, color: VendorUI.colors.textMuted },
-  exportBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: VendorUI.colors.surface },
+  header: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
+  backBtn: {
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: VendorUI.colors.white, borderWidth: 1, borderColor: VendorUI.colors.border, marginTop: 2,
+  },
+  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: VendorUI.colors.primary },
+  title: { fontSize: 20, fontWeight: '800', color: VendorUI.colors.text, marginTop: 4, letterSpacing: -0.3 },
+  sub: { fontSize: 13, color: VendorUI.colors.textSecondary, marginTop: 2, fontWeight: '500' },
+  exportBtn: {
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: VendorUI.colors.white, borderWidth: 1, borderColor: VendorUI.colors.border, marginTop: 2,
+  },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10,
-    backgroundColor: VendorUI.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: VendorUI.colors.border, paddingHorizontal: 12,
+    backgroundColor: VendorUI.colors.white, borderRadius: 14, borderWidth: 1, borderColor: VendorUI.colors.border, paddingHorizontal: 12,
   },
   search: { flex: 1, paddingVertical: 10, color: VendorUI.colors.text },
   summaryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
-  chip: { flex: 1, backgroundColor: VendorUI.colors.surface, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: VendorUI.colors.border },
+  chip: { flex: 1, backgroundColor: VendorUI.colors.white, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: VendorUI.colors.border },
   chipValue: { fontWeight: '800', color: VendorUI.colors.primaryDark, fontSize: 16 },
   chipLabel: { fontSize: 11, color: VendorUI.colors.textMuted, marginTop: 2 },
   center: { padding: 40, alignItems: 'center' },
   error: { color: VendorUI.colors.textMuted, textAlign: 'center', marginBottom: 12 },
-  retry: { backgroundColor: VendorUI.colors.primaryDark, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  retry: { backgroundColor: VendorUI.colors.primaryDark, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
   retryText: { color: '#FFF9F2', fontWeight: '700' },
   emptyTitle: { fontWeight: '800', color: VendorUI.colors.text, fontSize: 16 },
   emptySub: { color: VendorUI.colors.textMuted, textAlign: 'center', marginTop: 6 },
-  card: { backgroundColor: VendorUI.colors.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: VendorUI.colors.border },
+  card: { backgroundColor: VendorUI.colors.white, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: VendorUI.colors.border },
   name: { fontWeight: '800', color: VendorUI.colors.text, fontSize: 15 },
   email: { color: VendorUI.colors.textMuted, fontSize: 12, marginTop: 2 },
   meta: { color: VendorUI.colors.textSecondary, fontSize: 12, marginTop: 8 },

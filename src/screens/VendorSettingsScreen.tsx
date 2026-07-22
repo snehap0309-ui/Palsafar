@@ -37,7 +37,7 @@ function formatCategory(cat: string) {
 
 export default function VendorSettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const insets = useVendorScreenInsets();
+  const insets = useVendorScreenInsets({ withTabBar: false });
   const { currentVendor, updateVendorProfile } = useDataContext();
 
   const [businessName, setBusinessName] = useState('');
@@ -171,11 +171,14 @@ export default function VendorSettingsScreen() {
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={VendorUI.colors.bg} />
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12}>
-            <Icon name="arrow-back" size={22} color={VendorUI.colors.text} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
+            <Icon name="arrow-back" size={22} color={VendorUI.colors.primaryDark} />
           </TouchableOpacity>
-          <Text style={styles.title}>Business settings</Text>
-          <View style={{ width: 22 }} />
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>VENDOR WORKSPACE</Text>
+            <Text style={styles.title}>Business settings</Text>
+          </View>
+          <View style={{ width: 42 }} />
         </View>
         <View style={styles.empty}>
           <Text style={styles.emptyText}>Vendor profile not loaded yet.</Text>
@@ -188,11 +191,14 @@ export default function VendorSettingsScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={VendorUI.colors.bg} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12}>
-          <Icon name="arrow-back" size={22} color={VendorUI.colors.text} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
+          <Icon name="arrow-back" size={22} color={VendorUI.colors.primaryDark} />
         </TouchableOpacity>
-        <Text style={styles.title}>Business settings</Text>
-        <View style={{ width: 22 }} />
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>VENDOR WORKSPACE</Text>
+          <Text style={styles.title}>Business settings</Text>
+        </View>
+        <View style={{ width: 42 }} />
       </View>
 
       <KeyboardAvoidingView
@@ -340,28 +346,45 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: VendorUI.colors.bg },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: VendorUI.space.screen,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: VendorUI.colors.border,
+    gap: 10,
   },
-  title: { fontSize: 17, fontWeight: '800', color: VendorUI.colors.text },
-  content: { paddingHorizontal: VendorUI.space.screen, paddingTop: 16 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: VendorUI.colors.white,
+    borderWidth: 1,
+    borderColor: VendorUI.colors.border,
+    marginTop: 2,
+  },
+  headerCopy: { flex: 1, minWidth: 0 },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    color: VendorUI.colors.primary,
+  },
+  title: { fontSize: 20, fontWeight: '800', color: VendorUI.colors.text, marginTop: 4, letterSpacing: -0.3 },
+  content: { paddingHorizontal: VendorUI.space.screen, paddingTop: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: VendorUI.colors.textMuted },
   section: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '800',
-    color: VendorUI.colors.primaryDark,
+    color: VendorUI.colors.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 1,
     marginBottom: 10,
+    marginTop: 8,
   },
   codeCard: {
-    backgroundColor: VendorUI.colors.surface,
-    borderRadius: VendorUI.radius.md,
+    backgroundColor: VendorUI.colors.white,
+    borderRadius: 16,
     padding: 14,
     borderWidth: 1,
     borderColor: VendorUI.colors.border,
@@ -383,7 +406,7 @@ const styles = StyleSheet.create({
   },
   hint: { fontSize: 12, color: VendorUI.colors.textMuted, marginTop: 4 },
   input: {
-    backgroundColor: VendorUI.colors.surface,
+    backgroundColor: VendorUI.colors.white,
     borderWidth: 1,
     borderColor: VendorUI.colors.border,
     borderRadius: VendorUI.radius.md,
@@ -399,20 +422,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: VendorUI.colors.surface,
+    backgroundColor: VendorUI.colors.white,
     borderWidth: 1,
     borderColor: VendorUI.colors.border,
   },
   chipActive: { backgroundColor: VendorUI.colors.primaryDark, borderColor: VendorUI.colors.primaryDark },
   chipText: { fontSize: 12, fontWeight: '700', color: VendorUI.colors.textSecondary },
-  chipTextActive: { color: '#fff' },
+  chipTextActive: { color: '#FFF9F2' },
   photoBtn: { alignItems: 'center', marginBottom: 8, gap: 8 },
   photo: { width: 96, height: 96, borderRadius: 16 },
   photoPlaceholder: {
     width: 96,
     height: 96,
     borderRadius: 16,
-    backgroundColor: VendorUI.colors.surface,
+    backgroundColor: VendorUI.colors.soft,
     borderWidth: 1,
     borderColor: VendorUI.colors.border,
     alignItems: 'center',
@@ -455,11 +478,11 @@ const styles = StyleSheet.create({
   linkLabel: { fontSize: 14, fontWeight: '600', color: VendorUI.colors.text },
   saveBtn: {
     marginTop: 24,
-    backgroundColor: VendorUI.colors.primary,
-    borderRadius: VendorUI.radius.md,
+    backgroundColor: VendorUI.colors.primaryDark,
+    borderRadius: 20,
     paddingVertical: 14,
     alignItems: 'center',
   },
   saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  saveBtnText: { color: '#FFF9F2', fontSize: 15, fontWeight: '800' },
 });

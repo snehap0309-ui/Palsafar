@@ -31,6 +31,11 @@ if (typeof global.performance === 'undefined') {
 // handler and showed popup alerts for every fatal JS exception.
 
 import 'react-native-gesture-handler';
+
+// Crash reporting MUST initialize before the React tree mounts.
+import { initMonitoring, Sentry, isMonitoringEnabled } from './src/services/monitoring';
+initMonitoring();
+
 import {AppRegistry} from 'react-native';
 import AppWrapper from './App';
 import {name as appName} from './app.json';
@@ -48,6 +53,16 @@ try {
       if (__DEV__) {
         console.log('[FCM] Background message received:', remoteMessage?.messageId);
       }
+      try {
+        const { addMonitoringBreadcrumb } = require('./src/services/monitoring');
+        addMonitoringBreadcrumb('notification', 'delivered', {
+          source: 'fcm_background',
+          messageId: remoteMessage?.messageId,
+          type: remoteMessage?.data?.type,
+        });
+      } catch {
+        /* monitoring optional */
+      }
     });
   } else if (typeof messaging.default === 'function') {
     // Legacy namespaced API
@@ -55,10 +70,27 @@ try {
       if (__DEV__) {
         console.log('[FCM] Background message received:', remoteMessage?.messageId);
       }
+      try {
+        const { addMonitoringBreadcrumb } = require('./src/services/monitoring');
+        addMonitoringBreadcrumb('notification', 'delivered', {
+          source: 'fcm_background',
+          messageId: remoteMessage?.messageId,
+          type: remoteMessage?.data?.type,
+        });
+      } catch {
+        /* monitoring optional */
+      }
     });
   }
 } catch (error) {
   console.warn('[FCM] Failed to register background handler:', error);
+  try {
+    const { captureNonFatal } = require('./src/services/monitoring');
+    captureNonFatal(error, { source: 'index.js', step: 'fcm_background_handler' });
+  } catch {
+    /* monitoring may be disabled */
+  }
 }
 
-AppRegistry.registerComponent(appName, () => AppWrapper);
+const AppRoot = isMonitoringEnabled() ? Sentry.wrap(AppWrapper) : AppWrapper;
+AppRegistry.registerComponent(appName, () => AppRoot);

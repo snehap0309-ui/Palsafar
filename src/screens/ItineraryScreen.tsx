@@ -12,6 +12,7 @@ import { tripsApi, TripPlan, TripPlanStop } from '../services/api/trips';
 import ItinerarySummaryCard from '../components/ItinerarySummaryCard';
 import ItineraryTimeline from '../components/ItineraryTimeline';
 import { LinearGradient } from '../utils/LinearGradient';
+import { useBottomSafePadding } from '../design/responsive';
 
 function stopToTouristSpot(stop: TripPlanStop, dayNumber: number): TouristSpot {
   const place = stop.place;
@@ -53,6 +54,7 @@ export default function ItineraryScreen(props: ItineraryScreenProps) {
   const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { user: ctxUser, setUser, isGuest } = useUserContext();
+  const startTripBottomPad = useBottomSafePadding(20);
 
   const user = props.user || ctxUser;
 
@@ -296,7 +298,7 @@ export default function ItineraryScreen(props: ItineraryScreenProps) {
         />
       </ScrollView>
 
-      <View style={styles.startTripBar}>
+      <View style={[styles.startTripBar, { paddingBottom: startTripBottomPad }]}>
         <TouchableOpacity
           onPress={() => {
             if (scheduledSpots.length > 0) {
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
   scheduleBadge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
   scheduleBadgeText: { fontSize: 12, fontFamily: 'Inter-SemiBold' },
 
-  startTripBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF9F2', padding: 20, paddingTop: 16, paddingBottom: Math.max(34, 20), borderTopWidth: 1, borderColor: 'rgba(200, 155, 60, 0.15)', elevation: 20, shadowColor: 'rgba(185,131,75,0.25)', shadowOffset: {width: 0, height: -10}, shadowOpacity: 0.2, shadowRadius: 20 },
+  startTripBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF9F2', padding: 20, paddingTop: 16, paddingBottom: 0, borderTopWidth: 1, borderColor: 'rgba(200, 155, 60, 0.15)', elevation: 20, shadowColor: 'rgba(185,131,75,0.25)', shadowOffset: {width: 0, height: -10}, shadowOpacity: 0.2, shadowRadius: 20 },
   startTripBtn: { backgroundColor: '#63300E', height: 56, borderRadius: 28, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#63300E', shadowOffset: {width: 0, height: 8}, shadowOpacity: 0.25, shadowRadius: 16, elevation: 6 },
   startTripText: { color: '#FFF9F2', fontSize: 16, fontFamily: 'Inter-Bold' },
 });

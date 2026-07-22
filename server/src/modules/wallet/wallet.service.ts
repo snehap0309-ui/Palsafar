@@ -227,7 +227,7 @@ export const walletService = {
     const ranks = data.map((w, i) => {
       const permission = String(w.user.permission || 'USER').toUpperCase();
       const roles = (w.user.userRoles || []).map((r) => String(r.role).toUpperCase());
-      let roleLabel = 'Explorer';
+      let roleLabel = 'Traveler';
       if (permission === 'VENDOR' || roles.includes('VENDOR')) roleLabel = 'Vendor';
       else if (
         permission === 'CONTENT_CREATOR' ||

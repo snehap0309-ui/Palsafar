@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import HomeSidebar from '../components/HomeSidebar';
 import { DEV_FLAGS } from '../config/devFlags';
 import { tripsApi, TripPlan } from '../services/api/trips';
 import { countTripStops, ensureManualDraftTrip } from '../utils/quickAddPlace';
+import { subscribeUnreadBadge } from '../services/notifications/notificationBadgeStore';
+import { refreshUnreadBadgeCount } from '../services/notificationService';
 
 const HERO = require('../assets/settings_cover.png');
 const AI_CARD_IMG = require('../assets/itinerary_ai_card.png');
@@ -65,7 +67,7 @@ type ItineraryCard = {
 const SAMPLE_ITINERARIES: ItineraryCard[] = [
   {
     id: 'sample-jabalpur',
-    title: 'Jabalpur Explorer',
+    title: 'Jabalpur Highlights',
     days: 3,
     places: 8,
     image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
@@ -262,6 +264,8 @@ export default function ItineraryHubScreen() {
   const [loading, setLoading] = useState(true);
   const [startingManual, setStartingManual] = useState(false);
 
+  useEffect(() => subscribeUnreadBadge(setUnreadNotifications), []);
+
   const switchableModes = useMemo(
     () => getSwitchableModes(user, currentVendor?.verificationStatus),
     [user, currentVendor?.verificationStatus],
@@ -290,15 +294,7 @@ export default function ItineraryHubScreen() {
     useCallback(() => {
       loadTrips();
       if (isGuest || !DEV_FLAGS.USE_SERVER_API) return;
-      let cancelled = false;
-      (async () => {
-        try {
-          const { notificationsApi } = require('../services/api/notifications') as typeof import('../services/api/notifications');
-          const res = await notificationsApi.list(1, 5);
-          if (!cancelled) setUnreadNotifications(res?.unreadCount ?? 0);
-        } catch { /* offline */ }
-      })();
-      return () => { cancelled = true; };
+      void refreshUnreadBadgeCount();
     }, [loadTrips, isGuest]),
   );
 
@@ -311,8 +307,23 @@ export default function ItineraryHubScreen() {
       }
       return;
     }
+    if (item.id.startsWith('sample-')) {
+      Alert.alert(
+        'Sample itinerary',
+        'Sign in and create your own trip, or use AI Planner to generate one.',
+      );
+      return;
+    }
     navigation.navigate('MyTrips');
   };
+
+  const handleOpenAiPlanner = useCallback(() => {
+    if (isGuest) {
+      Alert.alert('Sign In Required', 'Sign in to use AI Trip Planner.');
+      return;
+    }
+    navigation.navigate('AITripPlanner');
+  }, [isGuest, navigation]);
 
   const handleBuildManual = useCallback(async () => {
     if (isGuest) {
@@ -370,7 +381,7 @@ export default function ItineraryHubScreen() {
             <PlannerCard
               variant="ai"
               width={plannerW}
-              onPress={() => navigation.navigate('AITripPlanner')}
+              onPress={handleOpenAiPlanner}
             />
             <PlannerCard
               variant="manual"

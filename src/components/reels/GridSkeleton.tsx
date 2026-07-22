@@ -1,14 +1,13 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, Animated } from 'react-native';
-
-const { width: WINDOW_WIDTH } = Dimensions.get('window');
-const GRID_ITEM_SIZE = (WINDOW_WIDTH - 4) / 3;
+import { View, StyleSheet, useWindowDimensions, Animated } from 'react-native';
 
 interface GridSkeletonProps {
   count?: number;
 }
 
 export const GridSkeleton: React.FC<GridSkeletonProps> = React.memo(({ count = 9 }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const gridItemSize = (windowWidth - 4) / 3;
   const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -33,7 +32,14 @@ export const GridSkeleton: React.FC<GridSkeletonProps> = React.memo(({ count = 9
   return (
     <View style={styles.grid}>
       {[...Array(count)].map((_, i) => (
-        <Animated.View key={i} style={[styles.gridItem, animatedStyle]} />
+        <Animated.View
+          key={i}
+          style={[
+            styles.gridItem,
+            { width: gridItemSize, height: gridItemSize * 1.5 },
+            animatedStyle,
+          ]}
+        />
       ))}
     </View>
   );
@@ -47,8 +53,6 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   gridItem: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE * 1.5, // Standard vertical aspect ratio for reels
     backgroundColor: '#333',
   },
 });

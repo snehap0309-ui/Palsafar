@@ -22,6 +22,7 @@ import { uploadApi } from '../services/api/upload';
 import { questsApi } from '../services/api/quests';
 import { launchCamera } from 'react-native-image-picker';
 import { haversineDistance, formatDistance } from '../utils/location';
+import { useHeaderSafePadding } from '../design/responsive';
 
 const NEARBY_HUNT_RADIUS_KM = 60;
 
@@ -30,6 +31,7 @@ interface TreasureHuntScreenProps {
 }
 
 export default function TreasureHuntScreen({ onBack }: TreasureHuntScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const { effectivePosition } = useLocationContext();
   const { user, setUser } = useUserContext();
   const { handleCompleteActivity } = useDataContext();
@@ -329,7 +331,7 @@ export default function TreasureHuntScreen({ onBack }: TreasureHuntScreenProps) 
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -523,7 +525,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: 0,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

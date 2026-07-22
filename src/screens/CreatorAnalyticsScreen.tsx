@@ -12,6 +12,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { socialApi } from '../services/api/social';
 import type { CreatorAnalytics } from '../types';
+import { useBottomSafePadding } from '../design/responsive';
 
 const C = {
   bg: '#FFF9F2',
@@ -26,6 +27,7 @@ const compact = (v: number) =>
   v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(v);
 
 export default function CreatorAnalyticsScreen({ onBack }: { onBack?: () => void }) {
+  const scrollPadBottom = useBottomSafePadding(24);
   const [period, setPeriod] = useState<'7d' | '30d' | 'all'>('7d');
   const [data, setData] = useState<CreatorAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,7 +81,7 @@ export default function CreatorAnalyticsScreen({ onBack }: { onBack?: () => void
       <FlatList
         data={data?.topReels || []}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: scrollPadBottom }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={C.bronze} />
         }
@@ -170,7 +172,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   retryText: { color: '#fff', fontWeight: '800' },
-  list: { padding: 20, paddingBottom: 120 },
+  list: { padding: 20 },
   backBtn: { marginBottom: 8, alignSelf: 'flex-start' },
   eyebrow: { fontSize: 11, letterSpacing: 1.4, color: C.bronze, fontWeight: '800' },
   title: { fontSize: 27, fontWeight: '800', color: C.deep, marginTop: 4 },

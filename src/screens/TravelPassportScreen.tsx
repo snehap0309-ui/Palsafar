@@ -13,6 +13,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { useUserContext } from '../context/UserContext';
+import { useHeaderSafePadding, useBottomSafePadding } from '../design/responsive';
 import { tripsApi } from '../services/api/trips';
 import { placesApi } from '../services/api';
 import { loadItineraryPlaceCache } from '../utils/itineraryPlacesCache';
@@ -74,6 +75,8 @@ async function resolvePlaceIds(ids: string[]): Promise<PassportPlace[]> {
 }
 
 export default function TravelPassportScreen({ onBack }: { onBack: () => void }) {
+  const headerPadTop = useHeaderSafePadding(12);
+  const bottomPad = useBottomSafePadding(24);
   const { theme } = useTheme();
   const { user } = useUserContext();
   const [places, setPlaces] = useState<PassportPlace[]>([]);
@@ -141,6 +144,7 @@ export default function TravelPassportScreen({ onBack }: { onBack: () => void })
             name: 'Place',
             city: 'Unknown',
             state: 'Unknown',
+            category: 'general',
             source: 'itinerary' as const,
           })),
       ]).filter((p) => p.name !== 'Place' || p.city !== 'Unknown');
@@ -312,7 +316,7 @@ export default function TravelPassportScreen({ onBack }: { onBack: () => void })
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={theme.background} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Icon name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
@@ -384,7 +388,7 @@ export default function TravelPassportScreen({ onBack }: { onBack: () => void })
           data={stats.cityProgress}
           keyExtractor={(item) => item.name}
           renderItem={renderCityItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
         />
       ) : activeTab === 'states' ? (
@@ -392,11 +396,11 @@ export default function TravelPassportScreen({ onBack }: { onBack: () => void })
           data={stats.stateProgress}
           keyExtractor={(item) => item.name}
           renderItem={renderStateItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <ScrollView contentContainerStyle={styles.gemScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.gemScroll, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.gemBigCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={{ fontSize: 64, textAlign: 'center', marginBottom: 12 }}>💎</Text>
             <Text style={[styles.gemBigTitle, { color: theme.text }]}>Hidden Gem Hunter</Text>
@@ -438,7 +442,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 56,
     paddingBottom: 16,
   },
   backButton: { padding: 4 },

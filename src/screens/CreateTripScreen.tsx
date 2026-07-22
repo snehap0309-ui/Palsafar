@@ -5,6 +5,9 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { GradientButton } from '../components/ui/GradientButton';
 import { Badge } from '../components/ui/Badge';
 import { tripsApi } from '../services/api/trips';
+import { useHeaderSafePadding } from '../design/responsive';
+import { getMainTabBarClearance } from '../design/tabBarLayout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const travelers = ['SOLO', 'COUPLE', 'FAMILY', 'FRIENDS'] as const;
 const transportModes = ['WALKING', 'BIKE', 'CAR', 'TRAIN', 'FLIGHT'] as const;
@@ -53,6 +56,8 @@ function OptionChip({ label, emoji, selected, onPress }: OptionChipProps) {
 }
 
 export default function CreateTripScreen({ onNavigate }: { onNavigate?: (screen: string, params?: any) => void }) {
+  const headerPadTop = useHeaderSafePadding(12);
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
   const [destination, setDestination] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -102,7 +107,7 @@ export default function CreateTripScreen({ onNavigate }: { onNavigate?: (screen:
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: Pal.colors.light.background }} showsVerticalScrollIndicator={false}>
-      <View style={{ padding: Pal.spacing[5], paddingTop: 56, gap: Pal.spacing[6] }}>
+      <View style={{ padding: Pal.spacing[5], paddingTop: headerPadTop, gap: Pal.spacing[6] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TouchableOpacity onPress={() => onNavigate?.('goBack')} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Pal.colors.light.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Pal.colors.light.border }}>
             <Text style={{ fontSize: 18 }}>←</Text>
@@ -228,7 +233,7 @@ export default function CreateTripScreen({ onNavigate }: { onNavigate?: (screen:
           fullWidth
         />
 
-        <View style={{ paddingBottom: 128 }} />
+        <View style={{ paddingBottom: getMainTabBarClearance(insets.bottom) }} />
       </View>
     </ScrollView>
   );

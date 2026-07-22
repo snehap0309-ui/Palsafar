@@ -7,7 +7,6 @@ import {
   Modal,
   Animated,
   Easing,
-  Dimensions,
   Image,
   ScrollView,
   Alert,
@@ -19,9 +18,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { UserActiveMode, UserProfile } from '../types';
 import { getSwitchableModes, isCreatorApproved, isVendorApproved } from '../utils/workspaceRoles';
-
-const { width: SCREEN_W } = Dimensions.get('window');
-const SIDEBAR_W = Math.min(SCREEN_W * 0.88, 360);
+import { useSidebarWidth } from '../design/responsive';
 
 const C = {
   bg: '#FFF9F2',
@@ -130,16 +127,17 @@ export default function HomeSidebar({
   vendorVerificationStatus,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(SIDEBAR_W)).current;
+  const sidebarW = useSidebarWidth();
+  const slideAnim = useRef(new Animated.Value(sidebarW)).current;
 
   useEffect(() => {
     Animated.timing(slideAnim, {
-      toValue: visible ? 0 : SIDEBAR_W,
+      toValue: visible ? 0 : sidebarW,
       duration: 260,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [visible, slideAnim]);
+  }, [visible, sidebarW, slideAnim]);
 
   const firstName = user.displayName?.split(' ')[0] || 'Traveler';
   const initial = (firstName[0] || 'P').toUpperCase();
@@ -254,7 +252,7 @@ export default function HomeSidebar({
       <Animated.View
         style={[
           sb.panel,
-          { width: SIDEBAR_W, paddingTop: insets.top + 12, transform: [{ translateX: slideAnim }] },
+          { width: sidebarW, paddingTop: insets.top + 12, transform: [{ translateX: slideAnim }] },
         ]}
       >
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>

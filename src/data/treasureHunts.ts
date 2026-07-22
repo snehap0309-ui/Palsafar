@@ -106,7 +106,7 @@ export const treasureHunts: TreasureHunt[] = [
     difficulty: 'easy',
     estimatedTime: '1-2 hours',
     rewardCoins: 120,
-    rewardBadge: '🏛️ Capital Explorer',
+    rewardBadge: '🏛️ Capital Guide',
     city: 'Delhi',
     checkpoints: [
       { id: 'cp_ld1', spotId: 'india-gate', spotName: 'India Gate', clue: 'The grand triumphal arch honoring Indian soldiers.', isCompleted: false, order: 1, lat: 28.6129, lng: 77.2295, verificationMode: 'gps' },
@@ -257,7 +257,7 @@ export const treasureHunts: TreasureHunt[] = [
     difficulty: 'easy',
     estimatedTime: '3 hours',
     rewardCoins: 160,
-    rewardBadge: '🏖️ Sun-kissed Explorer',
+    rewardBadge: '🏖️ Sun-kissed Traveler',
     city: 'Goa',
     checkpoints: [
       { id: 'cp_gb1', spotId: 'basilica-of-bom-jesus', spotName: 'Basilica of Bom Jesus', clue: 'Holds the sacred mortal remains of St. Francis Xavier.', isCompleted: false, order: 1, lat: 15.5009, lng: 73.9116, verificationMode: 'gps_photo' },

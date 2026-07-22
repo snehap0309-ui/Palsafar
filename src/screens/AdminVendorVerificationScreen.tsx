@@ -3,13 +3,22 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert,
 import { colors, spacing, borderRadius } from '../config/theme';
 import { MaterialIcons } from '../utils/Icons';
 import { vendorsApi, Vendor } from '../services/api';
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface AdminVendorVerificationScreenProps {
   onBack: () => void;
   onLogout?: () => void;
+  onNavigateHiddenGems?: () => void;
+  onNavigatePlaces?: () => void;
 }
 
-export default function AdminVendorVerificationScreen({ onBack, onLogout }: AdminVendorVerificationScreenProps) {
+export default function AdminVendorVerificationScreen({
+  onBack,
+  onLogout,
+  onNavigateHiddenGems,
+  onNavigatePlaces,
+}: AdminVendorVerificationScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,7 +100,7 @@ export default function AdminVendorVerificationScreen({ onBack, onLogout }: Admi
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity onPress={onBack}>
           <MaterialIcons name="arrow-back" size={24} color={colors.primaryLight} />
         </TouchableOpacity>
@@ -109,6 +118,21 @@ export default function AdminVendorVerificationScreen({ onBack, onLogout }: Admi
           <View style={{ width: 24 }} />
         )}
       </View>
+
+      {(onNavigateHiddenGems || onNavigatePlaces) ? (
+        <View style={styles.quickNavRow}>
+          {onNavigateHiddenGems ? (
+            <TouchableOpacity style={styles.quickNavBtn} onPress={onNavigateHiddenGems}>
+              <Text style={styles.quickNavText}>Hidden gems</Text>
+            </TouchableOpacity>
+          ) : null}
+          {onNavigatePlaces ? (
+            <TouchableOpacity style={styles.quickNavBtn} onPress={onNavigatePlaces}>
+              <Text style={styles.quickNavText}>Places</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       <ScrollView
         style={styles.content}
@@ -245,7 +269,7 @@ export default function AdminVendorVerificationScreen({ onBack, onLogout }: Admi
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: spacing.xl },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: 0 },
   title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
   content: { flex: 1, padding: spacing.lg },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
@@ -278,6 +302,17 @@ const styles = StyleSheet.create({
   confirmRejectText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   rejectedReason: { fontSize: 12, color: colors.danger, marginTop: spacing.xs, fontStyle: 'italic' },
   emptyState: { alignItems: 'center', paddingVertical: spacing.xl, backgroundColor: colors.surface, borderRadius: borderRadius.md },
+  quickNavRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  quickNavBtn: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickNavText: { color: colors.primaryLight, fontSize: 13, fontWeight: '600' },
   emptyEmoji: { fontSize: 48, marginBottom: spacing.md },
   emptyText: { fontSize: 16, color: colors.success },
   loadingContainer: { alignItems: 'center', paddingVertical: spacing.xl, backgroundColor: colors.surface, borderRadius: borderRadius.md },

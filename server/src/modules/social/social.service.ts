@@ -233,8 +233,8 @@ export const socialService = {
     const badges = [];
     if (profile.totalViews >= 1000000) badges.push('Top Creator', 'PalSafar Ambassador');
     else if (profile.totalViews >= 100000) badges.push('Top Creator', 'Adventure Creator');
-    else if (profile.totalViews >= 10000) badges.push('Explorer', 'Hidden Gem Hunter');
-    else if (profile.totalViews >= 1000) badges.push('Explorer');
+    else if (profile.totalViews >= 10000) badges.push('Traveler', 'Hidden Gem Hunter');
+    else if (profile.totalViews >= 1000) badges.push('Traveler');
 
     if (profile.verified) badges.push('Verified Creator');
 

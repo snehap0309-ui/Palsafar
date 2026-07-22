@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { SimpleMarkdown } from '../components/ui/SimpleMarkdown';
 import { getLegalDocument } from '../services/legalCacheService';
 import type { LegalDocumentType, LegalDocumentPayload } from '../services/api/legal';
+import { useHeaderSafePadding, useBottomSafePadding } from '../design/responsive';
 
 interface LegalDocumentScreenProps {
   type: LegalDocumentType;
@@ -23,6 +24,8 @@ function formatDate(iso: string | null): string | null {
 
 export default function LegalDocumentScreen({ type, fallbackTitle, onBack }: LegalDocumentScreenProps) {
   const { theme } = useTheme();
+  const headerPadTop = useHeaderSafePadding(12);
+  const scrollPadBottom = useBottomSafePadding(24);
   const [loading, setLoading] = useState(true);
   const [document, setDocument] = useState<LegalDocumentPayload | null>(null);
   const [source, setSource] = useState<'network' | 'cache' | 'none'>('none');
@@ -51,7 +54,7 @@ export default function LegalDocumentScreen({ type, fallbackTitle, onBack }: Leg
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <View style={{ paddingTop: 56, paddingHorizontal: Pal.spacing[5], paddingBottom: Pal.spacing[4], flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <View style={{ paddingTop: headerPadTop, paddingHorizontal: Pal.spacing[5], paddingBottom: Pal.spacing[4], flexDirection: 'row', alignItems: 'center', gap: 14 }}>
         <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.glass, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ color: theme.text, fontSize: 20 }}>←</Text>
         </TouchableOpacity>
@@ -80,7 +83,7 @@ export default function LegalDocumentScreen({ type, fallbackTitle, onBack }: Leg
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: Pal.spacing[5], paddingBottom: 64 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: Pal.spacing[5], paddingBottom: scrollPadBottom }}>
           {source === 'cache' && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.warning + '18', borderRadius: Pal.borderRadius.lg, padding: Pal.spacing[3], marginBottom: Pal.spacing[4] }}>
               <Text style={{ fontSize: 14 }}>📡</Text>

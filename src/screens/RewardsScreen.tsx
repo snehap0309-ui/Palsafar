@@ -8,21 +8,18 @@ import {
   FlatList,
   ActivityIndicator,
   Modal,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '../utils/Icons';
 import { LinearGradient } from '../utils/LinearGradient';
 import { colors, spacing, borderRadius, shadows } from '../config/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderSafePadding } from '../design/responsive';
 import { DEV_FLAGS } from '../config/devFlags';
 import { rewardsApi, walletApi, VendorOfferItem } from '../services/api';
 import { UserProfile } from '../types';
 import QRCode from 'react-native-qrcode-svg';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const FEATURED_CARD_WIDTH = SCREEN_WIDTH * 0.72;
-const GRID_CARD_WIDTH = (SCREEN_WIDTH - spacing.md * 3) / 2;
 
 const CATEGORIES = [
   { key: 'all', label: 'All', icon: 'apps' },
@@ -60,6 +57,10 @@ export default function RewardsScreen({
 }: RewardsScreenProps) {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const FEATURED_CARD_WIDTH = SCREEN_WIDTH * 0.72;
+  const GRID_CARD_WIDTH = (SCREEN_WIDTH - spacing.md * 3) / 2;
+  const headerPadTop = useHeaderSafePadding(12);
   const [offers, setOffers] = useState<VendorOfferItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -190,7 +191,7 @@ export default function RewardsScreen({
         colors={gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.featuredCard}
+        style={[styles.featuredCard, { width: FEATURED_CARD_WIDTH }]}
       >
         <TouchableOpacity
           style={styles.featuredTouchable}
@@ -226,7 +227,7 @@ export default function RewardsScreen({
   };
 
   const renderGridCard = ({ item }: { item: VendorOfferItem }) => (
-    <View style={styles.gridCard}>
+    <View style={[styles.gridCard, { width: GRID_CARD_WIDTH }]}>
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => onSelectOffer(item.id)}
@@ -308,7 +309,7 @@ export default function RewardsScreen({
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: headerPadTop }]}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -327,7 +328,7 @@ export default function RewardsScreen({
   if (error && offers.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: headerPadTop }]}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -349,7 +350,7 @@ export default function RewardsScreen({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -610,7 +611,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -760,7 +760,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   featuredCard: {
-    width: FEATURED_CARD_WIDTH,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     marginRight: spacing.md,
@@ -843,7 +842,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   gridCard: {
-    width: GRID_CARD_WIDTH,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',

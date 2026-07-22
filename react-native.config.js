@@ -4,11 +4,6 @@ module.exports = {
     android: {},
   },
   assets: ['./assets/fonts/'],
-  dependencies: {
-    'react-native-vector-icons': {
-      platforms: {
-        ios: null,
-      },
-    },
-  },
+  // Vector icon fonts are linked for both platforms (UIAppFonts listed in ios/PalSafar/Info.plist).
+  dependencies: {},
 };

@@ -8,6 +8,7 @@ import {
 } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { apiClient } from '../services/api/client';
+import { clearMonitoringUser, setMonitoringUser, trackAuthEvent, trackRoleSwitch } from '../services/monitoring';
 
 interface UserContextType {
   user: UserProfile;
@@ -138,6 +139,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (sessionUser) {
         setUser(prev => ({ ...prev, ...sessionUser }));
         setIsAuthenticated(true);
+        trackAuthEvent('session_restored', { mode: sessionUser.activeMode || sessionUser.activeRole });
+        notificationService.syncDeviceAfterSessionRestore().catch((err) => {
+          console.warn('[UserContext] Token sync on session restore failed:', err);
+        });
       }
       if (cancelled) return;
       setIsInitializing(false);
@@ -150,6 +155,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (isStorageLoaded) saveUserProgress(user);
   }, [user, isStorageLoaded]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      clearMonitoringUser();
+      return;
+    }
+    setMonitoringUser({
+      id: user.uid,
+      role: user.permission,
+      activeMode: user.activeMode || user.activeRole,
+      roles: user.roles,
+    });
+  }, [
+    isAuthenticated,
+    user.uid,
+    user.permission,
+    user.activeMode,
+    user.activeRole,
+    user.roles,
+  ]);
+
   const onLogin = useCallback(async (email: string, password: string): Promise<boolean> => {
     setAuthLoading(true);
     try {
@@ -157,6 +182,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (result) {
         setUser(prev => ({ ...prev, ...result.user }));
         setIsAuthenticated(true);
+        trackAuthEvent('login', { mode: result.user.activeMode || result.user.activeRole });
 
         notificationService.requestPermission().then((granted) => {
           if (granted) {
@@ -183,6 +209,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (result) {
         setUser(prev => ({ ...prev, ...result.user }));
         setIsAuthenticated(true);
+        trackAuthEvent('signup', { mode: result.user.activeMode || result.user.activeRole });
 
         notificationService.requestPermission().then((granted) => {
           if (granted) {
@@ -203,8 +230,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const onLogout = useCallback(async () => {
+    trackAuthEvent('logout');
     notificationService.unregisterDeviceToken().catch(() => {});
     logout().catch(() => {});
+    clearMonitoringUser();
     setUser(GuestUser());
     setIsAuthenticated(false);
     setIsLoggingOut(true);
@@ -214,6 +243,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const onGuestContinue = useCallback(() => {
     setUser(GuestUser());
     setIsAuthenticated(true);
+    trackAuthEvent('guest');
+    setMonitoringUser({ id: 'guest-user', role: 'GUEST', activeMode: 'USER' });
   }, []);
 
   const onForgotPassword = useCallback(async (email: string): Promise<boolean> => {
@@ -251,6 +282,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     const previousMode = (user.activeMode || user.activeRole || 'USER') as UserActiveMode;
     if (previousMode === mode) return;
+
+    trackRoleSwitch(previousMode, mode);
 
     if (!canActivateWorkspace(user, mode)) {
       throw new Error('This workspace is not available for your account.');

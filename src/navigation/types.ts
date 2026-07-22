@@ -112,7 +112,6 @@ export type RootStackParamList = {
   CreatorProfile: { username: string };
   CreatorAnalytics: undefined;
   Credits: undefined;
-  TravelPassport: undefined;
   Wallet: undefined;
   Rewards: undefined;
   Leaderboard: undefined;
@@ -121,6 +120,9 @@ export type RootStackParamList = {
   VendorProfile: { vendorId: string; self?: boolean; initialTab?: 'offers' | 'reels' | 'info' };
   VendorSettings: undefined;
   Settings: undefined;
+  /** Dev-only crash reporting QA screen */
+  CrashTest: undefined;
+  DevNotificationTest: undefined;
   ChangePassword: undefined;
   DeleteAccount: undefined;
   Notifications: undefined;

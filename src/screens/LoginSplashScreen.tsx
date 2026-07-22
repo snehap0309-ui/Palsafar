@@ -1,37 +1,33 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Animated,
   Easing,
-  Dimensions,
   StatusBar,
   Image,
   TouchableWithoutFeedback,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useUserContext } from '../context/UserContext';
 
-const { width: W, height: H } = Dimensions.get('window');
-
 const ORBIT_ICONS = [
   'compass-outline', 'location-outline', 'business-outline', 'shield-checkmark-outline',
   'water-outline', 'diamond-outline', 'restaurant-outline', 'flag-outline',
 ];
-const ORBIT_CX = W / 2;
-const ORBIT_CY = H * 0.44;
-const ORBIT_R = W * 0.34;
 const ORBIT_ANGLE_START = 195;
 const ORBIT_ANGLE_END = 345;
 const ORBIT_COUNT = ORBIT_ICONS.length;
 
 const DRIFT_COUNT = 15;
-const DRIFT_PARTICLES = Array.from({ length: DRIFT_COUNT }, () => ({
-  x: Math.random() * W,
-  y: Math.random() * H,
+/** Ratio-seeded (0–1) so resize scales positions without re-randomizing. */
+const DRIFT_SEEDS = Array.from({ length: DRIFT_COUNT }, () => ({
+  x: Math.random(),
+  y: Math.random(),
   sz: 1 + Math.random() * 1.5,
   dur: 8000 + Math.random() * 8000,
   del: Math.random() * 5000,
@@ -41,6 +37,27 @@ const DRIFT_PARTICLES = Array.from({ length: DRIFT_COUNT }, () => ({
 
 export default function LoginSplashScreen({ navigation }: any) {
   const { onGuestContinue } = useUserContext();
+  const { width: W, height: H } = useWindowDimensions();
+
+  const { ORBIT_CX, ORBIT_CY, ORBIT_R } = useMemo(
+    () => ({
+      ORBIT_CX: W / 2,
+      ORBIT_CY: H * 0.44,
+      ORBIT_R: W * 0.34,
+    }),
+    [W, H],
+  );
+
+  const driftParticles = useMemo(
+    () =>
+      DRIFT_SEEDS.map((p) => ({
+        ...p,
+        x: p.x * W,
+        y: p.y * H,
+      })),
+    [W, H],
+  );
+
   const bgFade = useRef(new Animated.Value(0)).current;
   const lS = useRef(new Animated.Value(0.5)).current;
   const lF = useRef(new Animated.Value(0)).current;
@@ -55,7 +72,7 @@ export default function LoginSplashScreen({ navigation }: any) {
   const orbitA = useRef(new Animated.Value(0)).current;
   const iconApps = useRef(ORBIT_ICONS.map(() => new Animated.Value(0))).current;
 
-  const dAnims = useRef(DRIFT_PARTICLES.map(() => new Animated.Value(0))).current;
+  const dAnims = useRef(DRIFT_SEEDS.map(() => new Animated.Value(0))).current;
 
   const tF = useRef(new Animated.Value(0)).current;
   const tgF = useRef(new Animated.Value(0)).current;
@@ -143,7 +160,7 @@ export default function LoginSplashScreen({ navigation }: any) {
     });
 
     const driftLoops = dAnims.map((a, i) => {
-      const p = DRIFT_PARTICLES[i];
+      const p = DRIFT_SEEDS[i];
       const loop = Animated.loop(
         Animated.sequence([
           Animated.delay(p.del),
@@ -358,7 +375,7 @@ export default function LoginSplashScreen({ navigation }: any) {
         </Animated.View>
 
         {/* Drift particles */}
-        {DRIFT_PARTICLES.map((p, i) => {
+        {driftParticles.map((p, i) => {
           const o = dAnims[i].interpolate({ inputRange: [0, 0.1, 1], outputRange: [0, 0.08, 0] });
           const px = dAnims[i].interpolate({ inputRange: [0, 1], outputRange: [0, p.dx] });
           const py = dAnims[i].interpolate({ inputRange: [0, 1], outputRange: [0, p.dy] });
@@ -587,5 +604,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
-
-// Force Metro rebuild

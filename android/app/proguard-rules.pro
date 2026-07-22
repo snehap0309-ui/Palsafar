@@ -62,6 +62,11 @@
 -keep @interface com.facebook.proguard.annotations.DoNotStrip
 -keep @interface com.facebook.proguard.annotations.KeepGettersAndSetters
 
+# Sentry
+-keepattributes SourceFile,LineNumberTable
+-dontwarn io.sentry.**
+-keep class io.sentry.** { *; }
+
 # Keep React Native modules
 -keep @com.facebook.react.common.annotations.DeprecatedInNewArchitecture class *
 -keep class * extends com.facebook.react.bridge.JavaScriptModule { *; }

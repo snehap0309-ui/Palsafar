@@ -7,10 +7,12 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { monetizationApi } from '../services/api/monetization';
 import { useEntitlements } from '../context/EntitlementContext';
+import { useBottomSafePadding } from '../design/responsive';
 
 export default function PremiumUpgradeScreen({ onBack }: { onBack?: () => void }) {
   const navigation = useNavigation<any>();
   const { isPremium, entitlements } = useEntitlements();
+  const scrollPadBottom = useBottomSafePadding(24);
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export default function PremiumUpgradeScreen({ onBack }: { onBack?: () => void }
           <TouchableOpacity onPress={load} style={styles.btn}><Text style={styles.btnText}>Try again</Text></TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: scrollPadBottom }]}>
           {plans.length === 0 ? (
             <Text style={styles.empty}>No Premium plans published yet.</Text>
           ) : plans.map((plan) => {
@@ -111,7 +113,7 @@ const styles = StyleSheet.create({
   bannerSub: { color: '#8B7355', marginTop: 4, fontSize: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   error: { color: '#8B7355', marginBottom: 12, textAlign: 'center' },
-  list: { padding: 16, gap: 12, paddingBottom: 40 },
+  list: { padding: 16, gap: 12 },
   empty: { color: '#8B7355', textAlign: 'center', padding: 24 },
   card: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#E9D4BE', padding: 16, gap: 10 },
   planName: { fontSize: 18, fontWeight: '800', color: '#63300E' },

@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -19,6 +19,7 @@ import { useUserContext } from '../context/UserContext';
 import { socialApi } from '../services/api/social';
 import CreatorStudioSidebar from '../components/CreatorStudioSidebar';
 import type { CreatorAnalytics, CreatorDashboard, Reel } from '../types';
+import { useStudioTabScreenInsets } from '../design/tabBarLayout';
 
 const C = {
   bg: '#FFF9F2',
@@ -34,9 +35,7 @@ const C = {
   gold: '#D4A017',
 };
 
-const LEVELS = ['Explorer', 'Pathfinder', 'Storyteller', 'Ambassador'];
-const XP_PER_LEVEL = 500;
-const CHART_WIDTH = Dimensions.get('window').width - 72;
+const CHART_WIDTH_FALLBACK = 300;
 
 const compact = (value: number) =>
   value >= 1000000
@@ -76,10 +75,12 @@ function buildWeeklyViews(reels: Reel[], totalViews: number): number[] {
 }
 
 function PerformanceChart({ data, height = 140 }: { data: number[]; height?: number }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const chartWidth = Math.max(220, Math.min(windowWidth - 72, 520));
   const max = Math.max(...data, 1);
   const pad = { top: 10, bottom: 4, left: 0, right: 0 };
   const chartH = height - pad.top - pad.bottom;
-  const step = CHART_WIDTH / Math.max(data.length - 1, 1);
+  const step = chartWidth / Math.max(data.length - 1, 1);
   const points = data.map((v, i) => ({
     x: i * step,
     y: pad.top + chartH - (v / max) * chartH,
@@ -97,7 +98,7 @@ function PerformanceChart({ data, height = 140 }: { data: number[]; height?: num
           </Text>
         ))}
       </View>
-      <Svg width={CHART_WIDTH} height={height}>
+      <Svg width={chartWidth} height={height}>
         <Defs>
           <LinearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={C.bronze} stopOpacity="0.28" />
@@ -144,6 +145,7 @@ function OverviewStatCard({ stat }: { stat: OverviewStat }) {
 export default function CreatorDashboardScreen() {
   const navigation = useNavigation<any>();
   const { user, setActiveMode, onLogout } = useUserContext();
+  const studioInsets = useStudioTabScreenInsets();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dashboard, setDashboard] = useState<CreatorDashboard | null>(null);
   const [analytics, setAnalytics] = useState<CreatorAnalytics | null>(null);
@@ -195,10 +197,6 @@ export default function CreatorDashboardScreen() {
   );
 
   const palPoints = user.totalPoints || 0;
-  const xpInLevel = palPoints % XP_PER_LEVEL;
-  const levelIndex = Math.min(LEVELS.length - 1, Math.floor(palPoints / XP_PER_LEVEL));
-  const levelName = LEVELS[levelIndex];
-  const levelNumber = levelIndex + 1;
 
   const cyclePeriod = () => {
     Alert.alert('Performance period', undefined, [
@@ -272,7 +270,7 @@ export default function CreatorDashboardScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: studioInsets.scrollPadBottom }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true, period)} tintColor={C.bronze} />
@@ -370,27 +368,9 @@ export default function CreatorDashboardScreen() {
           <PerformanceChart data={chartData} />
         </View>
 
-        {/* Creator Level + Rewards */}
+        {/* PalPoints / Rewards */}
         <View style={styles.bottomRow}>
-          <View style={styles.levelCard}>
-            <View style={styles.hexBadgeWrap}>
-              <MaterialCommunityIcons name="hexagon-slice-6" size={44} color={C.gold} />
-              <Icon name="compass-outline" size={16} color={C.ink} style={styles.hexBadgeIcon} />
-            </View>
-            <Text style={styles.levelTitle}>{levelName}</Text>
-            <Text style={styles.levelSub}>Level {levelNumber}</Text>
-            <View style={styles.xpTrack}>
-              <View style={[styles.xpFill, { width: `${Math.min(100, (xpInLevel / XP_PER_LEVEL) * 100)}%` }]} />
-            </View>
-            <Text style={styles.xpText}>
-              {xpInLevel.toLocaleString('en-IN')} / {XP_PER_LEVEL.toLocaleString('en-IN')} PalPoints
-            </Text>
-            <Text style={styles.levelHint}>
-              Keep creating to level up and unlock exciting rewards!
-            </Text>
-          </View>
-
-          <View style={styles.rewardsCard}>
+          <View style={styles.rewardsCardFull}>
             <View style={styles.rewardsIconWrap}>
               <Icon name="gift-outline" size={20} color={C.ink} />
             </View>
@@ -434,7 +414,7 @@ export default function CreatorDashboardScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  content: { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 4 },
+  content: { paddingHorizontal: 16, paddingTop: 4 },
   center: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 28 },
 
   header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16, gap: 10 },
@@ -566,25 +546,7 @@ const styles = StyleSheet.create({
   chartXLabel: { fontSize: 9, fontFamily: 'Inter-Medium', color: C.textMuted, flex: 1, textAlign: 'center' },
 
   bottomRow: { flexDirection: 'row', gap: 10 },
-  levelCard: {
-    flex: 1,
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: 14,
-    alignItems: 'center',
-  },
-  hexBadgeWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  hexBadgeIcon: { position: 'absolute' },
-  levelTitle: { fontFamily: 'Inter-Black', fontSize: 14, color: C.deep, textAlign: 'center' },
-  levelSub: { fontFamily: 'Inter-Medium', fontSize: 11, color: C.muted, marginTop: 2, marginBottom: 10 },
-  xpTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: C.banner, overflow: 'hidden' },
-  xpFill: { height: '100%', backgroundColor: C.bronze, borderRadius: 3 },
-  xpText: { fontFamily: 'Inter-Bold', fontSize: 10, color: C.deep, marginTop: 6, textAlign: 'center' },
-  levelHint: { fontFamily: 'Inter-Medium', fontSize: 9, color: C.muted, marginTop: 6, lineHeight: 13, textAlign: 'center' },
-
-  rewardsCard: {
+  rewardsCardFull: {
     flex: 1,
     backgroundColor: C.surface,
     borderRadius: 16,

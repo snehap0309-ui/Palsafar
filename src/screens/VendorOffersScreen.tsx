@@ -15,6 +15,7 @@ import { getPlaces } from '../services/placesService';
 import { getSpotById } from '../utils/placeUtils';
 import OfferCard from '../components/OfferCard';
 import RedemptionSuccessModal from '../components/RedemptionSuccessModal';
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface VendorOffersScreenProps {
   user: UserProfile;
@@ -56,6 +57,7 @@ export default function VendorOffersScreen({
   vendorOffers,
   onRedeemOffer,
 }: VendorOffersScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const [filter, setFilter] = useState<string>('all');
   const [redemptionResult, setRedemptionResult] = useState<{
     redemption: VendorOfferRedemption;
@@ -137,7 +139,7 @@ export default function VendorOffersScreen({
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, { paddingTop: headerPadTop }]}>
         <View>
           <Text style={styles.title}>Vendor Offers</Text>
           <Text style={styles.subtitle}>Redeem Pal Points and save during your trip</Text>
@@ -225,7 +227,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xl,
+    paddingTop: 0,
     paddingBottom: spacing.xs,
   },
   title: {

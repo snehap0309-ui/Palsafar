@@ -1,30 +1,36 @@
 import { useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  STUDIO_TAB_BAR_HEIGHT,
+  STUDIO_TAB_BAR_BOTTOM_GAP,
+  STUDIO_TAB_CONTENT_GAP,
+  getStudioTabBarClearance,
+} from './tabBarLayout';
 
-/** Matches VendorTabs custom floating tab bar */
-export const VENDOR_TAB_BAR_HEIGHT = 64;
-/** Center Offers FAB rises above the bar */
-export const VENDOR_TAB_BAR_FAB_OVERHANG = 14;
-/** Floating bar gap from physical bottom (min with insets) */
-export const VENDOR_TAB_BAR_BOTTOM_GAP = 12;
-/** Extra breathing room above the tab bar */
-export const VENDOR_TAB_CONTENT_GAP = 28;
+/** @deprecated Prefer STUDIO_TAB_BAR_HEIGHT — kept for existing vendor imports */
+export const VENDOR_TAB_BAR_HEIGHT = STUDIO_TAB_BAR_HEIGHT;
+export const VENDOR_TAB_BAR_BOTTOM_GAP = STUDIO_TAB_BAR_BOTTOM_GAP;
+export const VENDOR_TAB_CONTENT_GAP = STUDIO_TAB_CONTENT_GAP;
 
-/** Shared vendor screen tokens — cream/bronze brand preserved */
+/** Shared vendor screen tokens — cream/bronze, Creator-aligned chrome */
 export const VendorUI = {
   colors: {
     bg: '#FFF9F2',
     white: '#FFFFFF',
-    surface: '#FBEFE2',
-    text: '#2C1810',
+    surface: '#FFFFFF',
+    soft: '#FBEFE2',
+    text: '#4D3227',
     textSecondary: '#8B7355',
     textMuted: '#B8A88A',
-    primary: '#B9834B',
+    primary: '#A67C52',
     primaryDark: '#63300E',
     primaryLight: '#D4A87A',
-    border: 'rgba(200, 155, 60, 0.2)',
-    success: '#6B8F71',
-    shadow: 'rgba(185, 131, 75, 0.18)',
+    bronze: '#B9834B',
+    deep: '#4D3227',
+    border: '#E9D4BE',
+    borderSoft: 'rgba(200, 155, 60, 0.22)',
+    success: '#059669',
+    shadow: 'rgba(99, 48, 14, 0.16)',
   },
   space: {
     xs: 4,
@@ -40,6 +46,8 @@ export const VendorUI = {
     md: 14,
     lg: 18,
     xl: 22,
+    pill: 20,
+    tabBar: 26,
     full: 999,
   },
   typography: {
@@ -50,17 +58,11 @@ export const VendorUI = {
     label: { fontSize: 11, fontWeight: '600' as const },
   },
   buttonHeight: 48,
-  headerBtnSize: 40,
+  headerBtnSize: 42,
 };
 
 export function getVendorTabBarClearance(bottomInset: number): number {
-  const floatGap = Math.max(bottomInset, VENDOR_TAB_BAR_BOTTOM_GAP);
-  return (
-    VENDOR_TAB_BAR_HEIGHT +
-    VENDOR_TAB_BAR_FAB_OVERHANG +
-    floatGap +
-    VENDOR_TAB_CONTENT_GAP
-  );
+  return getStudioTabBarClearance(bottomInset);
 }
 
 /**
@@ -72,15 +74,15 @@ export function useVendorScreenInsets(options?: { withTabBar?: boolean }) {
   const withTabBar = options?.withTabBar !== false;
 
   return useMemo(() => {
-    const tabClearance = withTabBar ? getVendorTabBarClearance(insets.bottom) : insets.bottom + VENDOR_TAB_CONTENT_GAP;
+    const tabClearance = withTabBar
+      ? getStudioTabBarClearance(insets.bottom)
+      : insets.bottom + STUDIO_TAB_CONTENT_GAP;
     return {
       top: insets.top,
       bottom: insets.bottom,
       left: insets.left,
       right: insets.right,
-      /** paddingTop for headers sitting under the status bar / Dynamic Island */
       headerPadTop: Math.max(insets.top, 8) + 8,
-      /** contentContainerStyle.paddingBottom so lists clear the floating tab bar */
       scrollPadBottom: tabClearance,
       tabClearance,
     };

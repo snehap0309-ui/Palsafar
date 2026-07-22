@@ -19,6 +19,12 @@ android/local.properties
 android/keystore.properties
 android/palsafar-release.keystore
 ios/build/
+ios/Pods/
+ios/PalSafar/GoogleService-Info.plist
+ios/.xcode.env.local
+**/xcuserdata/
+*.xcuserstate
+
 .gemini/
 *.tsbuildinfo
 server/uploads/reels/
@@ -26,6 +32,10 @@ status/
 scripts/check-creator.mjs
 .cursor/
 .github/
+
+# Local Sentry DSN / secrets (never commit)
+src/config/monitoring.local.ts
+sentry.properties.local
 
 android/hs_err_*.log
 *.hprof

@@ -4,12 +4,14 @@ import { colors, spacing, borderRadius } from '../config/theme';
 import { MaterialIcons } from '../utils/Icons';
 import { HiddenGemSubmission } from '../types';
 import { hiddenGemsApi } from '../services/api';
+import { useHeaderSafePadding } from '../design/responsive';
 
 interface AdminHiddenGemReviewScreenProps {
   onBack: () => void;
 }
 
 export default function AdminHiddenGemReviewScreen({ onBack }: AdminHiddenGemReviewScreenProps) {
+  const headerPadTop = useHeaderSafePadding(12);
   const [submissions, setSubmissions] = useState<HiddenGemSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -118,7 +120,7 @@ export default function AdminHiddenGemReviewScreen({ onBack }: AdminHiddenGemRev
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPadTop }]}>
         <TouchableOpacity onPress={onBack}>
           <MaterialIcons name="arrow-back" size={24} color={colors.primaryLight} />
         </TouchableOpacity>
@@ -308,7 +310,7 @@ export default function AdminHiddenGemReviewScreen({ onBack }: AdminHiddenGemRev
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: spacing.xl },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingTop: 0 },
   title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
   content: { flex: 1, padding: spacing.lg },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },

@@ -4,6 +4,7 @@ import { Pal } from '../design/DesignSystem';
 import { GlassCard } from '../components/ui/GlassCard';
 import { useTheme } from '../context/ThemeContext';
 import { useUserContext } from '../context/UserContext';
+import { useHeaderSafePadding } from '../design/responsive';
 import type { LegalDocumentType } from '../services/api/legal';
 
 interface LegalHubItem {
@@ -62,6 +63,7 @@ interface LegalHubScreenProps {
 
 export default function LegalHubScreen({ onBack, onSelect }: LegalHubScreenProps) {
   const { theme } = useTheme();
+  const headerPadTop = useHeaderSafePadding(12);
   const { user } = useUserContext();
 
   const groups = useMemo(() => {
@@ -73,7 +75,7 @@ export default function LegalHubScreen({ onBack, onSelect }: LegalHubScreenProps
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }} showsVerticalScrollIndicator={false}>
-      <View style={{ padding: Pal.spacing[5], paddingTop: 56, gap: Pal.spacing[6] }}>
+      <View style={{ padding: Pal.spacing[5], paddingTop: headerPadTop, gap: Pal.spacing[6] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.glass, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={{ color: theme.text, fontSize: 20 }}>←</Text>

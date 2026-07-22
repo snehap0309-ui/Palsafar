@@ -17,6 +17,7 @@ import { UserProfile } from '../types';
 import { DEV_FLAGS } from '../config/devFlags';
 import { walletApi, WalletProfile, WalletTransaction } from '../services/api';
 import BannerAdSlot from '../components/ads/BannerAdSlot';
+import { useHeaderSafePadding } from '../design/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface WalletScreenProps {
@@ -59,6 +60,7 @@ export default function WalletScreen({
   walletProfile: initialWalletProfile,
 }: WalletScreenProps) {
   const { theme } = useTheme();
+  const headerPadTop = useHeaderSafePadding(12);
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -140,7 +142,7 @@ export default function WalletScreen({
   if (loading && !refreshing) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: headerPadTop }]}>
           <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={onBack}>
             <Ionicons name="arrow-back" size={22} color={theme.text} />
           </TouchableOpacity>
@@ -157,7 +159,7 @@ export default function WalletScreen({
   if (error && !wallet) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: headerPadTop }]}>
           <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={onBack}>
             <Ionicons name="arrow-back" size={22} color={theme.text} />
           </TouchableOpacity>
@@ -186,8 +188,8 @@ export default function WalletScreen({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-      <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: spacing.md }]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: headerPadTop }]}>
         <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={onBack}>
           <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
@@ -393,7 +395,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: 0,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
   },

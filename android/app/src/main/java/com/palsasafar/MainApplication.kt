@@ -3,6 +3,8 @@ package com.palsasafar
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
@@ -37,20 +39,33 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
-    createNotificationChannel()
+    createNotificationChannels()
   }
 
-  private fun createNotificationChannel() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      val channel = NotificationChannel(
-        "default",
-        "PalSafar Notifications",
-        NotificationManager.IMPORTANCE_HIGH
-      ).apply {
-        description = "General notifications from PalSafar"
+  private fun createNotificationChannels() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    val manager = getSystemService(NotificationManager::class.java)
+    val defaultSound = AudioAttributes.Builder()
+      .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+      .build()
+
+    val channels = listOf(
+      Triple("default", "General", "General PalSafar alerts"),
+      Triple("rewards", "Rewards", "Points, offers, and redemptions"),
+      Triple("vendor", "Vendor", "Vendor workspace updates"),
+      Triple("creator", "Creator", "Creator studio updates"),
+      Triple("trips", "Trips", "Trip and itinerary updates"),
+      Triple("offers", "Offers", "Nearby offers and deals"),
+      Triple("system", "System", "Account and security notices"),
+      Triple("marketing", "Marketing", "Promotions and announcements"),
+    )
+
+    channels.forEach { (id, name, desc) ->
+      val channel = NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
+        description = desc
         enableVibration(true)
+        setSound(Uri.parse("content://settings/system/notification_sound"), defaultSound)
       }
-      val manager = getSystemService(NotificationManager::class.java)
       manager.createNotificationChannel(channel)
     }
   }

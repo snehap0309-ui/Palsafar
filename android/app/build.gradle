@@ -97,6 +97,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Keep versionName/versionCode in sync with src/config/monitoringConfig.ts (Sentry release).
         // Google sample AdMob app ID for debug; override via ADMOB_APP_ID env for production.
         manifestPlaceholders += [
             ADMOB_APP_ID: (System.getenv("ADMOB_APP_ID") ?: "ca-app-pub-3940256099942544~3347511713")
@@ -155,3 +156,4 @@ dependencies {
 }
 
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+apply from: "../../node_modules/@sentry/react-native/sentry.gradle"
