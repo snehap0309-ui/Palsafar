@@ -249,6 +249,7 @@ model PointTransaction {
 
   @@index([userId])
   @@index([createdAt])
+  @@index([userId, type, createdAt])
   @@map("point_transactions")
 }
 

@@ -92,12 +92,11 @@ export const refreshLimiter = createLimiter({
 
 export const loginLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
-  // Failed attempts only — successful logins never consume the budget
-  max: 120,
+  max: 3,
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, data: null, message: 'Please try again in a moment.' },
+  message: { success: false, data: null, message: 'Too many login attempts. Please try again in 15 minutes.' },
 });
 
 export const uploadLimiter = createLimiter({

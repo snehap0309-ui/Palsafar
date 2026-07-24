@@ -18,19 +18,22 @@ export const pointsService = {
   async earn(userId: string, amount: number, reason: string, referenceId?: string) {
     if (amount <= 0) throw new ApiError(400, 'Amount must be positive');
 
-    const [balance] = await Promise.all([
-      prisma.pointBalance.upsert({
+    const balance = await prisma.$transaction(async (tx) => {
+      const updated = await tx.pointBalance.upsert({
         where: { userId },
         update: {
           balance: { increment: amount },
           lifetimeEarned: { increment: amount },
         },
         create: { userId, balance: amount, lifetimeEarned: amount, lifetimeSpent: 0 },
-      }),
-      prisma.pointTransaction.create({
+      });
+
+      await tx.pointTransaction.create({
         data: { userId, amount, type: 'EARN', reason, referenceId },
-      }),
-    ]);
+      });
+
+      return updated;
+    });
 
     await auditService.log(AuditAction.POINTS_EARNED, 'PointTransaction', referenceId || balance.id, userId, null, null, { amount, reason, referenceId });
 
@@ -40,23 +43,26 @@ export const pointsService = {
   async spend(userId: string, amount: number, reason: string, referenceId?: string) {
     if (amount <= 0) throw new ApiError(400, 'Amount must be positive');
 
-    const balance = await prisma.pointBalance.findUnique({ where: { userId } });
-    if (!balance || balance.balance < amount) {
-      throw new ApiError(400, 'Insufficient points');
-    }
+    const updated = await prisma.$transaction(async (tx) => {
+      const balance = await tx.pointBalance.findUnique({ where: { userId } });
+      if (!balance || balance.balance < amount) {
+        throw new ApiError(400, 'Insufficient points');
+      }
 
-    const [updated] = await Promise.all([
-      prisma.pointBalance.update({
+      const updatedBalance = await tx.pointBalance.update({
         where: { userId },
         data: {
           balance: { decrement: amount },
           lifetimeSpent: { increment: amount },
         },
-      }),
-      prisma.pointTransaction.create({
+      });
+
+      await tx.pointTransaction.create({
         data: { userId, amount: -amount, type: 'SPEND', reason, referenceId },
-      }),
-    ]);
+      });
+
+      return updatedBalance;
+    });
 
     await auditService.log(AuditAction.POINTS_REDEEMED, 'PointTransaction', referenceId || updated.id, userId, null, null, { amount, reason, referenceId });
 

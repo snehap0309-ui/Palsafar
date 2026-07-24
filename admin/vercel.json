@@ -1,5 +1,9 @@
 {
-  "version": 2,
+  "framework": "nextjs",
   "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "outputDirectory": ".next",
+  "installCommand": "npm ci",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://palsafar-api.onrender.com/api/v1"
+  }
 }

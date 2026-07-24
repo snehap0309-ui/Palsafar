@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database';
+import { logger } from '../../config/logger';
 
 /** Collapse doubled letters (nidaan → nidan) for soft spelling matches. */
 function collapseRepeats(value: string): string {
@@ -214,7 +215,7 @@ export const searchService = {
         userId: userId || null,
         resultCount: totalResults,
       },
-    }).catch(err => console.error('Failed to log search query', err));
+    }).catch(err => logger.warn({ err, query: q }, 'Failed to log search query'));
 
     return {
       places: placesRaw,
